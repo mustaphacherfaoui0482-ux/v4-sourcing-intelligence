@@ -1,10 +1,12 @@
 /**
- * V4 Sourcing Intelligence — Feedback Loop Engine v1
+ * V4 Sourcing Intelligence — Feedback Loop Engine v1.1
  * Learns from real product tests using explicit metrics.
- * No AI in V1.
+ * No AI decision making.
  */
 
 const clamp = (value) => Math.max(0, Math.min(100, Number(value) || 0));
+
+const feedbackHistory = [];
 
 export function evaluateTestResult(input = {}) {
   const metrics = {
@@ -29,7 +31,7 @@ export function evaluateTestResult(input = {}) {
       ? 'optimize'
       : 'reject';
 
-  return {
+  const result = {
     performanceScore,
     status,
     metrics,
@@ -39,4 +41,15 @@ export function evaluateTestResult(input = {}) {
       updateDecisionHistory: true,
     },
   };
+
+  feedbackHistory.push({
+    createdAt: new Date().toISOString(),
+    result,
+  });
+
+  return result;
+}
+
+export function getFeedbackHistory() {
+  return feedbackHistory;
 }
