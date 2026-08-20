@@ -1,0 +1,1 @@
+Integrated UI prepared; final atomic entry-point swap remains pending technical verification.
