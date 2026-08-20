@@ -1,0 +1,1 @@
+The previous Radar v1 index remains recoverable in Git history. Original index blob SHA: `c7e03408d67cb5ee813324db455664ff9241d272`. The new integrated interface is built from `index-next.html`.
