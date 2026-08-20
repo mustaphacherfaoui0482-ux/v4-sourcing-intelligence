@@ -1,0 +1,1 @@
+V4 Radar integrated interface prepared. The live index imports modules/v4-ui-decision-bridge.js.
