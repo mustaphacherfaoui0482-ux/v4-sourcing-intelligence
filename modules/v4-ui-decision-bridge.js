@@ -1,8 +1,7 @@
-// V4 UI Decision Bridge v1
+// V4 UI Decision Bridge v2
 // Connects the live Radar form to the deterministic decision engine.
 
 import { evaluateOpportunity } from './decision-engine.js';
-import { evaluateOfferForDecision } from './v4-offer-engine-adapter.js';
 
 const n = (id) => Number(document.getElementById(id)?.value) || 0;
 
@@ -14,7 +13,10 @@ function runV4DecisionBridge() {
   const cac = n('cac');
   const targetMargin = n('margin');
 
-  const offer = evaluateOfferForDecision({
+  // Pass raw offer inputs into Decision Engine v2.
+  // The decision engine owns the economic calculation so the UI and engine
+  // cannot silently diverge.
+  const offer = {
     salePrice,
     landedCost,
     variableFees,
@@ -22,20 +24,18 @@ function runV4DecisionBridge() {
     targetMargin,
     visitors: 1000,
     conversionRate: 2,
-  });
-
-  const legacyScore = Math.min(100, Math.max(0, n('sale') > 0
-    ? ((salePrice - landedCost - variableFees - cac) / salePrice) * 100
-    : 0));
+  };
 
   const decision = evaluateOpportunity({
     demandScore: 50,
     sourcingScore: 50,
-    profitabilityScore: Math.round(legacyScore),
-    riskScore: offer.recommendation === 'avoid' ? 90 : offer.recommendation === 'optimize' ? 55 : 30,
+    profitabilityScore: 0,
+    riskScore: 30,
     confidence: 50,
+    offer,
   });
 
+  const result = decision.offer;
   let panel = document.getElementById('v4-engine-decision');
   if (!panel) {
     panel = document.createElement('div');
@@ -44,11 +44,13 @@ function runV4DecisionBridge() {
     document.querySelector('section.card:nth-of-type(8)')?.appendChild(panel);
   }
 
+  panel.className = `status ${decision.decision === 'EVITER' ? 'danger' : 'positive'}`;
   panel.innerHTML = `<b>🧠 Decision Engine V4 :</b> ${decision.decision}
-    · économie : ${offer.economics.status}
-    · résilience : ${offer.resilience}%
-    · recommandation offre : ${offer.recommendation}
-    · score décision : ${decision.score}/100`;
+    · économie : ${result?.economics.status ?? '—'}
+    · résilience : ${result?.resilience ?? 0}%
+    · recommandation offre : ${result?.recommendation ?? '—'}
+    · score décision : ${decision.score}/100
+    · ${decision.reason}`;
 }
 
 window.addEventListener('DOMContentLoaded', () => {
