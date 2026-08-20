@@ -1,10 +1,12 @@
-// V4 Market Intelligence Engine v1
+// V4 Market Intelligence Engine v2
 
 const MARKET_STATUS = {
   STRONG: 'strong',
   REVIEW: 'review',
   WEAK: 'weak'
 };
+
+const signals = [];
 
 function calculateMarketScore(data = {}) {
   const trend = Number(data.trend || 0);
@@ -39,8 +41,31 @@ function evaluateMarket(data = {}) {
   };
 }
 
+function addSignal(signal = {}) {
+  signals.push({
+    ...signal,
+    createdAt: new Date().toISOString()
+  });
+
+  return signals[signals.length - 1];
+}
+
+function getSignals() {
+  return signals;
+}
+
+function getStatus() {
+  return {
+    module: 'v4-market-intelligence-engine',
+    status: 'active'
+  };
+}
+
 module.exports = {
   calculateMarketScore,
   evaluateMarket,
+  addSignal,
+  getSignals,
+  getStatus,
   MARKET_STATUS
 };
