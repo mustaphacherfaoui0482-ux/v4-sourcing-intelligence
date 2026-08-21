@@ -1,7 +1,7 @@
-/** V4 UI persistence bridge — keeps the current Radar state recoverable. */
+/** V4 UI persistence bridge v2 — keeps Radar + evidence state recoverable. */
 import { saveState, loadState } from './v4-persistence.js';
 
-const FIELD_IDS = ['product','country','budget','sale','margin','moq','constraints','p','c','pack','ship','customs','other','fees','cac','sampleStatus','qc'];
+const FIELD_IDS = ['product','country','budget','sale','margin','moq','constraints','p','c','pack','ship','customs','other','fees','cac','sampleStatus','qc','demandScore','sourcingScore','riskScore','confidenceScore'];
 
 export function captureRadarState(root = document) {
   const state = {};
@@ -27,10 +27,7 @@ export function bindRadarPersistence(root = document) {
   const save = () => saveState('radar', captureRadarState(root));
   for (const id of FIELD_IDS) {
     const el = root.getElementById?.(id);
-    if (el) {
-      el.addEventListener('input', save);
-      el.addEventListener('change', save);
-    }
+    if (el) { el.addEventListener('input', save); el.addEventListener('change', save); }
   }
   return save;
 }
