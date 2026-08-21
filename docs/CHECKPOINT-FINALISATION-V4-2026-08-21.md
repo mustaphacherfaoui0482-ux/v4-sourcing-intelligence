@@ -1,4 +1,4 @@
-# CHECKPOINT V4 — FINALISATION
+# CHECKPOINT V4 — FINALISATION TECHNIQUE
 
 **Date :** 21 août 2026  
 **Projet :** V4 Sourcing Intelligence  
@@ -6,93 +6,153 @@
 
 ## 1. Objet
 
-Ce document est le checkpoint de reprise de la phase de finalisation technique. Il ne remplace pas le MASTER V4 et ne le modifie pas.
+Ce document est le checkpoint officiel de reprise de la phase de finalisation technique.
 
-Il sert à conserver exactement :
-- ce qui a été vérifié et construit ;
-- ce qui reste à accomplir ;
-- les règles à respecter pour terminer V4 sans repartir de zéro.
+Il **ne remplace pas le MASTER V4** et ne modifie pas le MASTER. Il conserve l'état du travail pour permettre de reprendre exactement là où nous nous sommes arrêtés.
 
-## 2. Travail accompli
+---
 
-- Modèle canonique `Opportunity` identifié et utilisé comme source de vérité du runtime.
-- `createOpportunity()` identifié comme point de normalisation de l'Opportunity.
-- Radar / sourcing relié au modèle canonique.
-- `dashboard-runtime.js` relié à l'Opportunity canonique.
-- Adaptateur de présentation Opportunity → Dashboard identifié.
-- Data Layer avec collection `opportunities` identifié.
-- Fallback `DEMO_OPPORTUNITY` conservé pour éviter de casser le Dashboard lorsqu'aucune Opportunity réelle n'est disponible.
-- Bridge Active Opportunity ajouté sur la branche de travail.
-- Priorité du bridge : `window.V4SourcingOpportunity` → `localStorage` → Data Layer → `DEMO_OPPORTUNITY`.
-- Mécanisme de rafraîchissement du runtime ajouté.
-- Aucun changement volontaire de design ou de direction graphique.
-- Aucun ajout de nouvelle infrastructure de base de données.
-- Preview Vercel observé en état `READY` lors de la vérification précédente.
+## 2. Ce que nous avons fait et vérifié
 
-## 3. Ce qui reste à accomplir
+### Architecture Opportunity
 
-### A — Validation runtime
+- Le modèle canonique `Opportunity` existe.
+- `createOpportunity()` est le point de normalisation de l'Opportunity.
+- Le Radar / sourcing produit une Opportunity canonique.
+- Le Radar Scoring Engine reste l'autorité du scoring.
+- `ui-adapter.js` sert à transformer l'Opportunity en données de présentation.
 
-- Ouvrir le preview dans un navigateur.
-- Vérifier que le runtime est effectivement exécuté.
-- Vérifier l'absence d'erreurs JavaScript dans la console.
-- Vérifier que `V4SourcingRuntime` est disponible et prêt.
+### Data Layer
 
-### B — Validation Opportunity
+- Une collection `opportunities` existe dans le Data Layer.
+- Le Data Layer permet la création, la lecture et la recherche d'Opportunities.
+- Le Data Layer actuel est une couche mémoire.
+- Aucune nouvelle base de données n'a été ajoutée pendant cette phase.
 
-- Vérifier qu'une Opportunity réelle peut alimenter le Dashboard.
-- Vérifier que les valeurs affichées correspondent à l'Opportunity canonique.
-- Vérifier que le fallback `DEMO_OPPORTUNITY` fonctionne uniquement lorsque nécessaire.
-- Vérifier le comportement après rechargement de la page.
+### Dashboard Runtime
+
+- `modules/dashboard-runtime.js` existe.
+- Le runtime consomme le modèle canonique Opportunity.
+- Le Dashboard possède encore `DEMO_OPPORTUNITY` comme fallback.
+- Le bridge Active Opportunity a été ajouté sur la branche de travail.
+- Ordre de priorité du bridge :
+
+`window.V4SourcingOpportunity → localStorage → Data Layer opportunities → DEMO_OPPORTUNITY`
+
+- Un mécanisme de rafraîchissement du runtime a été ajouté.
+- Le runtime expose son état via `window.V4SourcingRuntime`.
+- Le design existant n'a pas été volontairement refondu.
+
+### Déploiement / GitHub / Vercel
+
+- La branche `feat/dashboard-cost-breakdown-runtime` existe.
+- Le travail de runtime a été poussé sur cette branche.
+- Un preview Vercel a été observé en état `READY` lors de la vérification précédente.
+- `main` n'a pas été déclaré finalisé à ce checkpoint.
+- Le checkpoint Runtime V1 existant confirme déjà que la validation finale doit passer par l'ouverture du déploiement dans un navigateur et la comparaison avec l'Opportunity canonique.
+
+---
+
+## 3. Ce qui a été volontairement préservé
+
+- Pas de refonte graphique.
+- Pas de nouvelle fonctionnalité métier non nécessaire.
+- Pas de nouvelle infrastructure de base de données.
+- Pas de déplacement du scoring hors du Radar Scoring Engine.
+- Pas de remplacement inutile de l'architecture existante.
+- Pas de fusion vers `main` tant que la validation finale n'est pas prouvée.
+
+---
+
+## 4. Ce qui reste à accomplir
+
+### A — Validation navigateur / preview
+
+- [ ] Ouvrir le preview Vercel dans un navigateur.
+- [ ] Vérifier que le Dashboard se charge correctement.
+- [ ] Vérifier que le runtime est effectivement exécuté.
+- [ ] Vérifier que `V4SourcingRuntime` est disponible et prêt.
+- [ ] Vérifier l'absence d'erreurs JavaScript dans la console.
+
+### B — Validation du flux Opportunity
+
+- [ ] Vérifier le flux réel : `Radar → Opportunity → Data Layer → Dashboard`.
+- [ ] Vérifier qu'une Opportunity réelle alimente effectivement le Dashboard.
+- [ ] Vérifier que les valeurs affichées correspondent à l'Opportunity canonique.
+- [ ] Vérifier le produit, score, coût rendu, marge, décision, fournisseurs et autres champs branchés.
+- [ ] Vérifier que `DEMO_OPPORTUNITY` n'est utilisée qu'en fallback.
+- [ ] Vérifier le comportement après rechargement de la page.
 
 ### C — Validation visuelle
 
-- Comparer le Dashboard déployé à la référence visuelle.
-- Conserver les éléments corrects.
-- Corriger uniquement les écarts réellement constatés.
-- Ne pas lancer de refonte graphique.
+- [ ] Comparer le Dashboard déployé avec la référence visuelle.
+- [ ] Contrôler les éléments un par un.
+- [ ] Conserver les éléments conformes.
+- [ ] Corriger uniquement les écarts réellement constatés.
+- [ ] Ne pas lancer de refonte graphique.
 
-### D — Validation Git / Vercel
+### D — Validation GitHub / CI
 
-- Vérifier le PR et les contrôles disponibles.
-- Vérifier le build du commit final.
-- Si toutes les validations sont satisfaisantes, fusionner vers `main`.
-- Vérifier ensuite le déploiement résultant de `main`.
+- [ ] Vérifier le PR de la branche de travail.
+- [ ] Vérifier les contrôles CI disponibles.
+- [ ] Vérifier le diff final.
+- [ ] Vérifier qu'aucune modification parasite n'a été introduite.
 
-### E — Clôture
+### E — Finalisation Vercel
 
-- Effectuer un dernier contrôle fonctionnel.
-- Vérifier qu'aucune modification parasite n'a été introduite.
-- Créer le checkpoint final de clôture.
+- [ ] Si toutes les validations sont positives, fusionner vers `main`.
+- [ ] Vérifier le nouveau déploiement de production.
+- [ ] Vérifier que la production correspond exactement au code validé.
+- [ ] Effectuer un dernier contrôle fonctionnel.
 
-## 4. Règle d'exécution autonome
+### F — Clôture
 
-**Les tâches de finalisation déjà définies dans ce checkpoint doivent être exécutées sans demander d'accord intermédiaire à l'utilisateur.**
+- [ ] Créer le checkpoint final de clôture.
+- [ ] Marquer la phase comme FINALISÉE uniquement lorsque toutes les validations sont factuellement établies.
 
-Procédure :
+---
+
+## 5. RÈGLE D'EXÉCUTION AUTONOME
+
+> **Les tâches de finalisation déjà définies dans ce checkpoint doivent être exécutées sans demander d'accord intermédiaire à l'utilisateur.**
+
+Procédure normale :
 
 `VÉRIFIER → CORRIGER AU MINIMUM → TESTER → VÉRIFIER → CONTINUER`
 
+Il ne faut pas interrompre la séquence pour demander « OK ? » entre les tâches déjà définies.
+
 Une confirmation utilisateur n'est nécessaire que si une décision nouvelle, destructive, irréversible ou clairement hors périmètre apparaît.
 
-## 5. Contraintes absolues
+---
 
-- Ne rien inventer.
-- Ne pas déclarer un test réussi sans preuve.
+## 6. CONTRAINTES ABSOLUES
+
+- Ne jamais inventer un résultat de test.
+- Ne jamais déclarer une validation réussie sans preuve.
 - Ne pas prétendre qu'une API ou une persistance existe si elle n'est pas vérifiée.
 - Ne pas modifier le design sans nécessité démontrée.
-- Ne pas ajouter de fonctionnalités hors périmètre.
+- Ne pas ajouter de fonctionnalité hors périmètre.
 - Préserver l'architecture existante lorsqu'elle répond au besoin.
+- Ne pas recommencer inutilement une étape déjà validée.
 - En cas d'incertitude, écrire clairement : **« Je ne peux pas confirmer ça. »**
 
-## 6. Critère de finalisation
+---
 
-V4 ne doit être déclaré finalisé que lorsque les éléments suivants sont vérifiés factuellement :
+## 7. CRITÈRE DE FINALISATION
 
-`CODE → BUILD → RUNTIME → OPPORTUNITY → DASHBOARD DYNAMIQUE → CONSOLE → VISUEL → CI/PR → PRODUCTION`
+V4 ne doit être déclaré **FINALISÉ** que lorsque les éléments suivants sont vérifiés factuellement :
 
-## 7. Point de reprise
+`CODE → BUILD → RUNTIME → OPPORTUNITY RÉELLE → DASHBOARD DYNAMIQUE → CONSOLE → VISUEL → CI/PR → PRODUCTION`
 
-**Reprendre directement à la validation navigateur du preview, puis exécuter automatiquement toutes les tâches restantes de ce checkpoint sans demander d'accord intermédiaire.**
+Tant qu'un de ces éléments reste non vérifié, le statut doit rester :
 
-Aucune étape déjà validée ne doit être recommencée inutilement.
+**FINALISATION EN COURS**
+
+---
+
+## 8. POINT DE REPRISE EXACT
+
+**Reprendre directement à la validation navigateur du preview Vercel, puis exécuter automatiquement toutes les tâches restantes de ce checkpoint jusqu'à la finalisation, sans demander d'accord intermédiaire.**
+
+Aucune étape déjà validée ne doit être recommencée sans raison.
