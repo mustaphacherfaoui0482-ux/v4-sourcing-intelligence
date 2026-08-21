@@ -1,6 +1,5 @@
 import { getRecords } from '../data/v4-data-layer.js';
 import { createOpportunity } from './opportunity-model.js';
-import { DEMO_OPPORTUNITY } from './dashboard-runtime.js';
 
 const STORAGE_KEY = 'v4.activeOpportunity';
 
@@ -32,7 +31,7 @@ export function getActiveOpportunity() {
   return normalizeOpportunity(globalOpportunity)
     ?? normalizeOpportunity(storedOpportunity)
     ?? normalizeOpportunity(latestRecord)
-    ?? DEMO_OPPORTUNITY;
+    ?? null;
 }
 
 export function setActiveOpportunity(opportunity) {
