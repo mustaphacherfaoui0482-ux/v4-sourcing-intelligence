@@ -80,7 +80,6 @@ export function calculateDashboardState(opportunity = DEMO_OPPORTUNITY) {
 }
 
 const money = (value) => `${Number(value).toFixed(2).replace('.', ',')} €`;
-const percent = (value) => `${Number(value).toFixed(1).replace('.', ',')}%`;
 
 function setText(node, value) {
   if (node) node.textContent = value;
@@ -100,13 +99,13 @@ function setDecisionStyle(node, decision) {
   node.style.color = decision === 'TESTER' ? 'var(--g)' : decision === 'EVITER' ? 'var(--r)' : 'var(--o)';
 }
 
-function updateKpis(viewModel) {
+function updateKpis(viewModel, economics) {
   const cards = [...document.querySelectorAll('.kpis .kpi')];
   if (cards.length < 5) return;
 
   setGauge(cards[0].querySelector('.gauge'), Number(viewModel.score));
   setText(cards[0].querySelector('.good'), Number(viewModel.score) >= 75 ? 'Excellent potentiel' : Number(viewModel.score) >= 50 ? 'Potentiel à approfondir' : 'Potentiel faible');
-  setText(cards[1].querySelector('.val'), viewModel.dimensions.landedCost);
+  setText(cards[1].querySelector('.val'), money(economics.inputs.landedCost));
   setText(cards[2].querySelector('.val'), viewModel.dimensions.margin);
   setText(cards[3].querySelector('.val'), money(viewModel.economics.maxCacAtTargetMargin));
   setText(cards[4].querySelector('.decision'), viewModel.decision);
@@ -114,7 +113,7 @@ function updateKpis(viewModel) {
   setText(cards[4].querySelector('.sub'), viewModel.decisionReason);
 }
 
-function updatePhone(viewModel) {
+function updatePhone(viewModel, economics) {
   const phone = document.querySelector('.phone');
   if (!phone) return;
 
@@ -122,7 +121,7 @@ function updatePhone(viewModel) {
   const cards = [...phone.querySelectorAll('.pc')];
   if (cards.length < 4) return;
 
-  setText(cards[0].querySelector('b'), viewModel.dimensions.landedCost);
+  setText(cards[0].querySelector('b'), money(economics.inputs.landedCost));
   setText(cards[1].querySelector('b'), viewModel.dimensions.margin);
   setText(cards[2].querySelector('b'), money(viewModel.economics.maxCacAtTargetMargin));
   setText(cards[3].querySelector('b'), viewModel.decision);
@@ -184,8 +183,8 @@ export function initDashboardRuntime(opportunity = DEMO_OPPORTUNITY) {
   const state = calculateDashboardState(opportunity);
   const { viewModel } = state;
 
-  updateKpis(viewModel);
-  updatePhone(viewModel);
+  updateKpis(viewModel, state.economics);
+  updatePhone(viewModel, state.economics);
   updateCostAdvice(state.economics);
   updateSignals(state.opportunity);
   wireActions(state);
