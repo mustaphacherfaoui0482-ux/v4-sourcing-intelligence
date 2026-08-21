@@ -2,7 +2,7 @@
 
 ## Statut
 
-**GO officiel — méthode verrouillée. Contract DRAFT créé. Initial repository audit completed. Production code untouched.**
+**GO officiel — méthode verrouillée. Contract DRAFT créé. Initial repository audit completed. Production code untouched. Guardrails contractuels ajoutés.**
 
 ## Ce qui est verrouillé
 
@@ -31,12 +31,30 @@ L'Opportunity est le dossier décisionnel canonique.
 13. Delta est dérivé de Prediction + Result.
 14. `null ≠ 0`, `UNKNOWN ≠ LOW`, `INSUFFICIENT_DATA ≠ NON_VIABLE`.
 15. Les calculs déterministes doivent tracer leur version et leur calculation context.
+16. La provenance s'applique au niveau de chaque donnée importante, pas seulement du bloc.
+17. `Verification ≠ Freshness`.
+18. Evidence distingue `NOT_FOUND`, `UNKNOWN`, `UNVERIFIED`, `CONFLICTING`, `VERIFIED`.
+19. Les unités sont obligatoires lorsque pertinentes.
+20. `collectedAt`, `calculatedAt`, `updatedAt`, `startedAt`, `endedAt` et `asOf` ont des sémantiques distinctes.
+21. Les calculs exposent ou référencent leurs dépendances.
+22. L'immutabilité est sélective : `IMMUTABLE`, `VERSIONED`, `MUTABLE`.
+23. L'historique nécessaire à l'audit n'est jamais supprimé de façon destructive.
+24. Les opérations déterministes doivent être idempotentes lorsqu'elles sont spécifiées comme telles.
+25. Aucun magic default implicite (`CAC absent → 0`, `MOQ absent → 1`, etc.).
+26. Toute migration doit démontrer la conservation sémantique des données.
+27. V0.4 n'ajoute que des garde-fous de cohérence, auditabilité, déterminisme et migration ; les nouvelles fonctionnalités restent hors périmètre.
 
 ## Contract Authority
 
 Le fichier normatif est :
 
 `docs/CANONICAL-OPPORTUNITY-CONTRACT-V0.4.md`
+
+Les garde-fous détaillés sont enregistrés dans :
+
+`docs/CANONICAL-OPPORTUNITY-CONTRACT-V0.4-GUARDRAILS.md`
+
+Ils sont destinés à être intégrés au contrat canonique avant son passage à `AUTHORITATIVE`.
 
 Identité :
 
@@ -154,6 +172,25 @@ Audit détaillé : `docs/AUDIT-V0.4-TARGET-ACTUAL-INITIAL.md`
 - Legacy schema utilise encore `scoreV4`, `confidence`, `risks` et `decision` sous `analysis`.
 - History conserve actuellement `score`, `decision` et `confidence`, sans modèle Prediction/Result/Delta V0.4.
 
+## Nouvelles protections ajoutées avant finalisation du contrat
+
+Les 12 garde-fous sont maintenant formalisés dans l'addendum contractuel :
+
+1. provenance valeur par valeur ;
+2. séparation verification/freshness ;
+3. états Evidence `NOT_FOUND / UNKNOWN / UNVERIFIED / CONFLICTING / VERIFIED` ;
+4. unités explicites ;
+5. sémantique stricte des timestamps ;
+6. dépendances de calcul traçables ;
+7. immutabilité sélective ;
+8. conservation historique non destructive ;
+9. référence temporelle `asOf` ;
+10. idempotence ;
+11. interdiction des magic defaults ;
+12. conservation sémantique lors des migrations.
+
+Aucun moteur de production n'a été modifié pour ajouter ces protections.
+
 ## Non-goals immédiats
 
 Pas de :
@@ -171,7 +208,9 @@ Pas de :
 
 ## Prochaine étape
 
-**Compléter l'audit du dépôt réel**, notamment Risk, Evidence/Confidence, tests, configuration et historique complet, puis produire :
+**Intégrer les garde-fous au contrat canonique, puis compléter l'audit du dépôt réel**, notamment Risk, Evidence/Confidence, tests, configuration et historique complet.
+
+Produire ensuite :
 
 1. Gap Register complet ;
 2. Ownership Matrix validée ;
@@ -185,4 +224,4 @@ Pas de :
 
 État de départ : commit `30292cd01fdeb895bcf304d1b71445255e10f83e` sur `main`.
 
-Les modifications de cette branche sont **documentaires uniquement** : contrat, Master et checkpoint/audit. Aucun moteur de production n'a été modifié.
+Les modifications de cette branche restent **documentaires uniquement** : contrat, garde-fous, Master et checkpoint/audit. Aucun moteur de production n'a été modifié.
