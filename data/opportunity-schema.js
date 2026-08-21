@@ -13,6 +13,7 @@ export const opportunitySchema = {
     moq: null,
     availability: null
   },
+  suppliers: [],
   economics: {
     purchaseCost: 0,
     shippingCost: 0,
@@ -21,6 +22,11 @@ export const opportunitySchema = {
     sellingPrice: 0,
     margin: 0,
     cac: 0
+  },
+  marketSignals: {
+    competition: null,
+    saturation: null,
+    productionLeadTimeDays: null
   },
   analysis: {
     scoreV4: 0,
