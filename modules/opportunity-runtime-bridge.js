@@ -1,5 +1,4 @@
 import { getRecords } from '../data/v4-data-layer.js';
-import { createOpportunity } from './opportunity-model.js';
 
 const STORAGE_KEY = 'v4.activeOpportunity';
 
@@ -13,13 +12,8 @@ function readStoredOpportunity() {
   }
 }
 
-function normalizeOpportunity(value) {
-  if (!value || typeof value !== 'object') return null;
-  try {
-    return createOpportunity(value);
-  } catch {
-    return value;
-  }
+function isRuntimeOpportunity(value) {
+  return Boolean(value?.product && value?.offer && typeof value.offer === 'object');
 }
 
 export function getActiveOpportunity() {
@@ -28,20 +22,21 @@ export function getActiveOpportunity() {
   const records = getRecords('opportunities');
   const latestRecord = records.length ? records[records.length - 1] : null;
 
-  return normalizeOpportunity(globalOpportunity)
-    ?? normalizeOpportunity(storedOpportunity)
-    ?? normalizeOpportunity(latestRecord)
-    ?? null;
+  if (isRuntimeOpportunity(globalOpportunity)) return globalOpportunity;
+  if (isRuntimeOpportunity(storedOpportunity)) return storedOpportunity;
+  if (isRuntimeOpportunity(latestRecord)) return latestRecord;
+  return null;
 }
 
 export function setActiveOpportunity(opportunity) {
-  const canonical = normalizeOpportunity(opportunity);
-  if (!canonical) throw new TypeError('A valid Opportunity is required');
-
-  if (typeof window !== 'undefined') window.V4SourcingOpportunity = canonical;
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(canonical));
+  if (!isRuntimeOpportunity(opportunity)) {
+    throw new TypeError('A runtime Opportunity with product and offer is required');
   }
 
-  return canonical;
+  if (typeof window !== 'undefined') window.V4SourcingOpportunity = opportunity;
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(opportunity));
+  }
+
+  return opportunity;
 }
