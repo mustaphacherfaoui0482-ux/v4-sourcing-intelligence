@@ -1,8 +1,13 @@
 import { evaluateOpportunity } from './decision-engine.js';
 import { calculateOfferEconomics } from './v4-offer-economics-engine.js';
+import { buildRadarOpportunity } from './radar-orchestrator.js';
+import { toOpportunityViewModel } from './ui-adapter.js';
 
 export const DEMO_OPPORTUNITY = Object.freeze({
+  id: 'demo-hoodie-dz-premium',
   product: 'HOODIE DZ - PREMIUM 450GSM',
+  source: '1688',
+  country: 'CN',
   offer: {
     salePrice: 29.9,
     landedCost: 7,
@@ -17,12 +22,61 @@ export const DEMO_OPPORTUNITY = Object.freeze({
   profitabilityScore: 90,
   riskScore: 18,
   confidence: 92,
+  marketingScore: 90,
+  easeOfTest: 80,
+  availability: 80,
+  potential: 90,
+  landedCostScore: 90,
 });
+
+function toEngineInput(opportunity) {
+  const economics = calculateOfferEconomics(opportunity.offer);
+
+  return {
+    demand: opportunity.demandScore,
+    marketing: opportunity.marketingScore ?? opportunity.demandScore,
+    sourcing: opportunity.sourcingScore,
+    profitability: opportunity.profitabilityScore,
+    confidence: opportunity.confidence,
+    economics,
+  };
+}
 
 export function calculateDashboardState(opportunity = DEMO_OPPORTUNITY) {
   const economics = calculateOfferEconomics(opportunity.offer);
-  const decision = evaluateOpportunity(opportunity);
-  return Object.freeze({ economics, decision });
+  const decisionInput = {
+    ...opportunity,
+    landedCost: opportunity.offer.landedCost,
+    margin: economics.netContributionMargin,
+  };
+  const decision = evaluateOpportunity(decisionInput);
+
+  const canonical = buildRadarOpportunity({
+    id: opportunity.id,
+    product: opportunity.product,
+    source: opportunity.source,
+    country: opportunity.country,
+    radarSignals: toEngineInput(opportunity),
+    dimensions: {
+      potential: opportunity.potential,
+      demand: opportunity.demandScore,
+      margin: economics.netContributionMargin,
+      availability: opportunity.availability,
+      landedCost: opportunity.landedCostScore,
+      risk: opportunity.riskScore,
+      easeOfTest: opportunity.easeOfTest,
+      dataConfidence: opportunity.confidence,
+    },
+    economics,
+    decision,
+  });
+
+  return Object.freeze({
+    economics,
+    decision,
+    opportunity: canonical,
+    viewModel: toOpportunityViewModel(canonical),
+  });
 }
 
 const money = (value) => `${Number(value).toFixed(2).replace('.', ',')} €`;
@@ -46,33 +100,33 @@ function setDecisionStyle(node, decision) {
   node.style.color = decision === 'TESTER' ? 'var(--g)' : decision === 'EVITER' ? 'var(--r)' : 'var(--o)';
 }
 
-function updateKpis(result, economics) {
+function updateKpis(viewModel) {
   const cards = [...document.querySelectorAll('.kpis .kpi')];
   if (cards.length < 5) return;
 
-  setGauge(cards[0].querySelector('.gauge'), result.score);
-  setText(cards[0].querySelector('.good'), result.score >= 75 ? 'Excellent potentiel' : result.score >= 50 ? 'Potentiel à approfondir' : 'Potentiel faible');
-  setText(cards[1].querySelector('.val'), money(economics.inputs.landedCost));
-  setText(cards[2].querySelector('.val'), percent(economics.netContributionMargin));
-  setText(cards[3].querySelector('.val'), money(economics.maxCacAtTargetMargin));
-  setText(cards[4].querySelector('.decision'), result.decision);
-  setDecisionStyle(cards[4].querySelector('.decision'), result.decision);
-  setText(cards[4].querySelector('.sub'), result.reason);
+  setGauge(cards[0].querySelector('.gauge'), Number(viewModel.score));
+  setText(cards[0].querySelector('.good'), Number(viewModel.score) >= 75 ? 'Excellent potentiel' : Number(viewModel.score) >= 50 ? 'Potentiel à approfondir' : 'Potentiel faible');
+  setText(cards[1].querySelector('.val'), viewModel.dimensions.landedCost);
+  setText(cards[2].querySelector('.val'), viewModel.dimensions.margin);
+  setText(cards[3].querySelector('.val'), money(viewModel.economics.maxCacAtTargetMargin));
+  setText(cards[4].querySelector('.decision'), viewModel.decision);
+  setDecisionStyle(cards[4].querySelector('.decision'), viewModel.decision);
+  setText(cards[4].querySelector('.sub'), viewModel.decisionReason);
 }
 
-function updatePhone(result, economics) {
+function updatePhone(viewModel) {
   const phone = document.querySelector('.phone');
   if (!phone) return;
 
-  setGauge(phone.querySelector('.phoneg'), result.score);
+  setGauge(phone.querySelector('.phoneg'), Number(viewModel.score));
   const cards = [...phone.querySelectorAll('.pc')];
   if (cards.length < 4) return;
 
-  setText(cards[0].querySelector('b'), money(economics.inputs.landedCost));
-  setText(cards[1].querySelector('b'), percent(economics.netContributionMargin));
-  setText(cards[2].querySelector('b'), money(economics.maxCacAtTargetMargin));
-  setText(cards[3].querySelector('b'), result.decision);
-  setDecisionStyle(cards[3].querySelector('b'), result.decision);
+  setText(cards[0].querySelector('b'), viewModel.dimensions.landedCost);
+  setText(cards[1].querySelector('b'), viewModel.dimensions.margin);
+  setText(cards[2].querySelector('b'), money(viewModel.economics.maxCacAtTargetMargin));
+  setText(cards[3].querySelector('b'), viewModel.decision);
+  setDecisionStyle(cards[3].querySelector('b'), viewModel.decision);
 }
 
 function updateCostAdvice(economics) {
@@ -96,23 +150,23 @@ function updateCostAdvice(economics) {
 function updateSignals(opportunity) {
   const signals = [...document.querySelectorAll('.signals .sig')];
   if (signals.length < 5) return;
-  setText(signals[0].querySelector('span'), `Score demande : ${opportunity.demandScore}/100`);
+  setText(signals[0].querySelector('span'), `Score demande : ${opportunity.dimensions.demand}/100`);
   setText(signals[1].querySelector('span'), 'À confirmer par analyse marché');
   setText(signals[2].querySelector('span'), 'À confirmer par données');
-  setText(signals[3].querySelector('span'), `Risque calculé : ${opportunity.riskScore}/100`);
+  setText(signals[3].querySelector('span'), `Risque calculé : ${opportunity.dimensions.risk}/100`);
   setText(signals[4].querySelector('span'), 'Hypothèse fournisseur');
 }
 
-function wireActions(state, opportunity) {
+function wireActions(state) {
   const exportButton = [...document.querySelectorAll('button')].find((button) => button.textContent.includes('Exporter le rapport'));
   if (!exportButton) return;
 
   exportButton.addEventListener('click', () => {
     const report = {
-      product: opportunity.product,
-      score: state.decision.score,
-      decision: state.decision.decision,
-      reason: state.decision.reason,
+      product: state.opportunity.product,
+      score: state.opportunity.score,
+      decision: state.opportunity.decision,
+      reason: state.opportunity.decisionReason,
       economics: state.economics,
       generatedAt: new Date().toISOString(),
     };
@@ -128,15 +182,16 @@ function wireActions(state, opportunity) {
 
 export function initDashboardRuntime(opportunity = DEMO_OPPORTUNITY) {
   const state = calculateDashboardState(opportunity);
+  const { viewModel } = state;
 
-  updateKpis(state.decision, state.economics);
-  updatePhone(state.decision, state.economics);
+  updateKpis(viewModel);
+  updatePhone(viewModel);
   updateCostAdvice(state.economics);
-  updateSignals(opportunity);
-  wireActions(state, opportunity);
+  updateSignals(state.opportunity);
+  wireActions(state);
 
   document.documentElement.dataset.v4Runtime = 'ready';
-  window.V4SourcingRuntime = Object.freeze({ ...state, opportunity });
+  window.V4SourcingRuntime = Object.freeze(state);
   return state;
 }
 
