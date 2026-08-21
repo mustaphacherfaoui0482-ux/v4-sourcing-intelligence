@@ -1,10 +1,11 @@
-// V4 Sourcing Intelligence — Decision Engine v2
+// V4 Sourcing Intelligence — Decision Engine v3
 // Deterministic decision rules. UI/CSS dependencies are intentionally excluded.
 
 import { evaluateOfferForDecision } from './v4-offer-engine-adapter.js';
 
 export const DECISIONS = {
   TEST: 'TESTER',
+  INVESTIGATE: 'INVESTIGUER',
   ANALYZE: 'APPROFONDIR',
   WAIT: 'ATTENDRE',
   REJECT: 'EVITER',
@@ -29,9 +30,7 @@ export function evaluateOpportunity(data = {}) {
     offer = evaluateOfferForDecision(data.offer);
     const marginScore = clampScore(offer.economics.netContributionMargin * 2);
     profitability = Math.round(
-      profitability * 0.4 +
-      marginScore * 0.4 +
-      offer.resilience * 0.2,
+      profitability * 0.4 + marginScore * 0.4 + offer.resilience * 0.2,
     );
 
     if (offer.economics.status === 'loss') {
@@ -39,56 +38,31 @@ export function evaluateOpportunity(data = {}) {
     }
   }
 
-  const score = Math.round(
-    demand * 0.25 +
-    sourcing * 0.2 +
-    profitability * 0.3 +
-    confidence * 0.15 +
-    (100 - risk) * 0.1,
+  // Potential is deliberately separate from evidence confidence.
+  const potentialScore = clampScore(
+    data.potentialScore ?? data.opportunityScore ?? (
+      demand * 0.25 + sourcing * 0.2 + profitability * 0.3 + (100 - risk) * 0.1
+    ),
   );
 
-  if (confidence < 40) {
-    return {
-      decision: DECISIONS.WAIT,
-      score,
-      profitability,
-      offer,
-      reason: 'Données insuffisantes',
-    };
+  const score = Math.round(potentialScore * 0.85 + confidence * 0.15);
+
+  if (risk > 70 || offer?.recommendation === 'avoid') {
+    return { decision: DECISIONS.REJECT, score, potentialScore, profitability, offer, reason: 'Risque ou économie insuffisante' };
   }
 
-  if (
-    risk > 70 ||
-    score < 40 ||
-    offer?.recommendation === 'avoid'
-  ) {
-    return {
-      decision: DECISIONS.REJECT,
-      score,
-      profitability,
-      offer,
-      reason: 'Risque ou économie insuffisante',
-    };
+  // High potential + weak evidence = investigate before spending test budget.
+  if (potentialScore >= 75 && confidence < 60) {
+    return { decision: DECISIONS.INVESTIGATE, score, potentialScore, profitability, offer, reason: 'Potentiel élevé, preuves insuffisantes' };
   }
 
-  if (
-    score >= 75 &&
-    (!offer || offer.resilience >= 67)
-  ) {
-    return {
-      decision: DECISIONS.TEST,
-      score,
-      profitability,
-      offer,
-      reason: 'Opportunité à tester',
-    };
+  if (score < 40) {
+    return { decision: DECISIONS.REJECT, score, potentialScore, profitability, offer, reason: 'Potentiel insuffisant' };
   }
 
-  return {
-    decision: DECISIONS.ANALYZE,
-    score,
-    profitability,
-    offer,
-    reason: 'Analyse complémentaire nécessaire',
-  };
+  if (score >= 75 && confidence >= 60 && (!offer || offer.resilience >= 67)) {
+    return { decision: DECISIONS.TEST, score, potentialScore, profitability, offer, reason: 'Opportunité suffisamment étayée pour être testée' };
+  }
+
+  return { decision: DECISIONS.ANALYZE, score, potentialScore, profitability, offer, reason: 'Analyse complémentaire nécessaire' };
 }
