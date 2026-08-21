@@ -1,4 +1,4 @@
-# MASTER V4 — v1.1
+# MASTER V4 — v1.2
 
 ## Mise à jour — Architecture produit et commercialisation
 
@@ -200,3 +200,112 @@ Le checkpoint détaillé de la formation est conservé dans :
 `CHECKPOINTS/FORMATION-E-COMMERCE.md`
 
 Ce fichier sert de trace détaillée de la formation ; le Master conserve les décisions structurantes nécessaires à l'architecture et au produit.
+
+---
+
+# 9. GOUVERNANCE CONTRACTUELLE — CANONICAL OPPORTUNITY V0.4
+
+**Date : 21 août 2026**  
+**Statut : VALIDÉE COMME MÉTHODE — CONTRAT V0.4 EN DRAFT, EN ATTENTE DE CONFRONTATION AU DÉPÔT**
+
+Cette section devient la méthode officielle de travail pour la refonte contractuelle de Sourcing Intelligence. Elle ne modifie pas encore les moteurs de production.
+
+## 9.1 Architecture cible
+
+**RADAR → SIGNALS → OPPORTUNITY ENGINE → EVIDENCE → CONFIDENCE → POTENTIAL → ECONOMICS → RISK → DECISION → ACTION → RESULT → LEARNING**
+
+L'Opportunity est le dossier décisionnel canonique. Les moteurs sont des composants à pouvoirs limités.
+
+## 9.2 Principes non négociables
+
+- `SIGNAL ≠ OPPORTUNITY` ;
+- `EVIDENCE ≠ CONFIDENCE` ;
+- `potential ≠ confidence` ;
+- Economics reste une réalité financière calculée, pas un score arbitraire ;
+- Risk Gates peuvent bloquer une décision indépendamment du Potential ;
+- Decision Engine ne produit aucun second score global ;
+- une donnée canonique n'est calculée qu'à un seul endroit ;
+- `Read access ≠ ownership` ;
+- l'orchestrateur transporte l'Opportunity mais n'en est pas propriétaire ;
+- `opportunity.id` est stable ;
+- Prediction est immutable ;
+- Result ne réécrit jamais Prediction ;
+- Delta est dérivé de Prediction + Result ;
+- `null ≠ 0`, `UNKNOWN ≠ LOW`, `INSUFFICIENT_DATA ≠ NON_VIABLE`.
+
+## 9.3 Contract Authority
+
+Le contrat normatif est : `docs/CANONICAL-OPPORTUNITY-CONTRACT-V0.4.md`.
+
+- `contractId = CANONICAL-OPPORTUNITY` ;
+- `contractVersion = 0.4` ;
+- `schemaVersion = 0.4.0` ;
+- cycle : `DRAFT → REVIEW → VALIDATED → AUTHORITATIVE → SUPERSEDED`.
+
+Après validation, le contrat devient l'autorité normative. Une évolution suit :
+
+**CHANGE PROPOSAL → IMPACT ANALYSIS → NOUVELLE VERSION → MIGRATION PLAN → VALIDATION → AUTHORITATIVE**.
+
+Aucune modification silencieuse du contrat.
+
+## 9.4 TARGET / ACTUAL / GAP
+
+**TARGET** = ce que V0.4 exige.  
+**ACTUAL** = ce que le dépôt fait réellement.  
+**GAP** = différence démontrée entre TARGET et ACTUAL.
+
+Aucun moteur n'est déclaré conforme par intuition.
+
+## 9.5 Preuves d'audit
+
+Toute affirmation architecturale importante doit être localisable dans une preuve classée :
+
+`CODE · TEST · SCHEMA · CONFIGURATION · DOCUMENTATION`
+
+Pour les comportements exécutables : préférence à `CODE + TEST`.
+
+Chaque constat reçoit un Finding ID (`AUDIT-OPP-001`, `AUDIT-RADAR-002`, etc.) et doit pouvoir suivre :
+
+**CONTRACT → FINDING → MIGRATION → COMMIT → TEST → VERIFIED**.
+
+## 9.6 Taxonomie GAP fermée
+
+`CONFORME · À_ADAPTER · CONTRADICTORY · DUPLICATED · MISSING · LEGACY · À_SUPPRIMER · UNKNOWN`
+
+`UNKNOWN` signifie preuves insuffisantes et ne doit jamais être converti en conformité supposée.
+
+## 9.7 Calculation Context et auditabilité
+
+Les calculs sensibles doivent tracer, selon le moteur :
+
+`references · configurationVersion · locale · currency · exchangeRateReference · calculatedAt`.
+
+La règle de déterminisme est :
+
+> Même input + même engineVersion + même configuration + même calculationContext → même résultat.
+
+Cela permet de distinguer `DATA_CHANGED`, `ENGINE_CHANGED` et `CONTRACT_CHANGED`.
+
+## 9.8 Decision Trace
+
+`decision.trace[]` est une trace explicative des entrées/règles utilisées par Decision Engine. Ce n'est ni un nouveau moteur, ni un second score, ni une source canonique.
+
+## 9.9 STOP CODE et workflow obligatoire
+
+**Aucun moteur de production ne doit être modifié avant la fin de la spécification et de sa confrontation au dépôt réel.**
+
+Workflow officiel :
+
+**CANONICAL CONTRACT → REPOSITORY AUDIT → GAPS → OWNERSHIP MATRIX → READ/WRITE MATRIX → INVARIANT VALIDATION → MIGRATION PLAN → TEST PLAN → IMPLEMENTATION**.
+
+## 9.10 Non-goals V0.4
+
+Pas de ML, IA prédictive, nouveau Radar parallèle, nouveau Decision Engine, second score global, redesign UI, scraping massif prématuré, marketplace fournisseurs, automatisation complexe ou duplication des moteurs.
+
+## 9.11 Référence de checkpoint
+
+Le checkpoint détaillé est conservé dans :
+
+`CHECKPOINTS/CHECKPOINT-V0.4-CONTRACT-METHOD-2026-08-21.md`
+
+Le Master reste la source de vérité des décisions structurantes ; le checkpoint conserve la trace opérationnelle détaillée.
