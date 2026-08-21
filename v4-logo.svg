@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 118" role="img" aria-label="V4 Sourcing Intelligence">
+  <rect width="620" height="118" rx="12" fill="#0b1020"/>
+  <g fill="none" stroke="#22c55e" stroke-width="7" stroke-linecap="round">
+    <circle cx="48" cy="52" r="35"/>
+    <circle cx="48" cy="52" r="23"/>
+    <circle cx="48" cy="52" r="9" fill="#22c55e"/>
+    <path d="M73 77 L92 96"/>
+  </g>
+  <text x="112" y="46" fill="#22c55e" font-family="Inter,Arial,sans-serif" font-size="34" font-weight="800" letter-spacing="-1">V4</text>
+  <text x="112" y="82" fill="#f8fafc" font-family="Inter,Arial,sans-serif" font-size="27" font-weight="700" letter-spacing="-.7">SOURCING INTELLIGENCE</text>
+</svg>
