@@ -24,6 +24,7 @@ export function createOpportunity(input = {}) {
     },
     supplier: input.supplier ?? null,
     suppliers: Array.isArray(input.suppliers) ? input.suppliers : [],
+    costBreakdown: Array.isArray(input.costBreakdown) ? input.costBreakdown : [],
     economics: input.economics ?? null,
     evidence: Array.isArray(input.evidence) ? input.evidence : [],
     createdAt: input.createdAt ?? null,
