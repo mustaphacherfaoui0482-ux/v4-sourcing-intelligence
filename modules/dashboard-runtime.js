@@ -11,6 +11,11 @@ export const DEMO_OPPORTUNITY = Object.freeze({
       { label: 'Douane & Taxes', value: 0.6 }, { label: 'Transport France', value: 0.7 }, { label: 'Autres frais', value: 0.5 },
     ],
   },
+  suppliers: [
+    { id: 'demo-supplier-01', name: 'Supplier A', country: 'CN', unitPrice: 3.2, moq: 30, gsm: 450, composition: '100% coton', customization: true, leadTimeDays: 18, shippingCost: 0.7, score: 92, verificationStatus: 'to_verify' },
+    { id: 'demo-supplier-02', name: 'Supplier B', country: 'CN', unitPrice: 3.6, moq: 50, gsm: 450, composition: '100% coton', customization: true, leadTimeDays: 21, shippingCost: 0.8, score: 88, verificationStatus: 'to_verify' },
+    { id: 'demo-supplier-03', name: 'Supplier C', country: 'CN', unitPrice: 3.9, moq: 100, gsm: 420, composition: '100% coton', customization: true, leadTimeDays: 24, shippingCost: 0.9, score: 84, verificationStatus: 'to_verify' },
+  ],
   demandScore: 90, sourcingScore: 92, profitabilityScore: 90, riskScore: 18, confidence: 92, marketingScore: 90,
   easeOfTest: 80, availability: 80, potential: 90, landedCostScore: 90,
 });
@@ -25,6 +30,7 @@ export function calculateDashboardState(opportunity = DEMO_OPPORTUNITY) {
   const decision = evaluateOpportunity({ ...opportunity, landedCost: opportunity.offer.landedCost, margin: economics.netContributionMargin });
   const canonical = buildRadarOpportunity({
     id: opportunity.id, product: opportunity.product, source: opportunity.source, country: opportunity.country,
+    suppliers: opportunity.suppliers,
     radarSignals: toEngineInput(opportunity),
     dimensions: {
       potential: opportunity.potential, demand: opportunity.demandScore, margin: economics.netContributionMargin,
