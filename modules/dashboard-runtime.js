@@ -30,7 +30,7 @@ export function calculateDashboardState(opportunity = DEMO_OPPORTUNITY) {
   const decision = evaluateOpportunity({ ...opportunity, landedCost: opportunity.offer.landedCost, margin: economics.netContributionMargin });
   const canonical = buildRadarOpportunity({
     id: opportunity.id, product: opportunity.product, source: opportunity.source, country: opportunity.country,
-    suppliers: opportunity.suppliers,
+    suppliers: opportunity.suppliers, costBreakdown: opportunity.offer?.costBreakdown,
     radarSignals: toEngineInput(opportunity),
     dimensions: {
       potential: opportunity.potential, demand: opportunity.demandScore, margin: economics.netContributionMargin,
@@ -69,5 +69,5 @@ function updateSuppliers(suppliers) {
   });
 }
 function wireActions(state) { const exportButton = [...document.querySelectorAll('button')].find((button) => button.textContent.includes('Exporter le rapport')); if (!exportButton) return; exportButton.addEventListener('click', () => { const report = { product: state.opportunity.product, score: state.opportunity.score, decision: state.opportunity.decision, reason: state.opportunity.decisionReason, economics: state.economics, generatedAt: new Date().toISOString() }; const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'v4-sourcing-intelligence-report.json'; anchor.click(); URL.revokeObjectURL(url); }, { once: true }); }
-export function initDashboardRuntime(opportunity = DEMO_OPPORTUNITY) { const state = calculateDashboardState(opportunity); const { viewModel } = state; updateKpis(viewModel); updatePhone(viewModel); updateCostAdvice(state.economics); updateCostBreakdown(opportunity.offer?.costBreakdown, opportunity.offer?.landedCost); updateRadar(state.opportunity); updateSignals(state.opportunity); updateSuppliers(state.opportunity.suppliers); wireActions(state); document.documentElement.dataset.v4Runtime = 'ready'; window.V4SourcingRuntime = Object.freeze(state); return state; }
+export function initDashboardRuntime(opportunity = DEMO_OPPORTUNITY) { const state = calculateDashboardState(opportunity); const { viewModel } = state; updateKpis(viewModel); updatePhone(viewModel); updateCostAdvice(state.economics); updateCostBreakdown(state.opportunity.costBreakdown, state.opportunity.dimensions.landedCost); updateRadar(state.opportunity); updateSignals(state.opportunity); updateSuppliers(state.opportunity.suppliers); wireActions(state); document.documentElement.dataset.v4Runtime = 'ready'; window.V4SourcingRuntime = Object.freeze(state); return state; }
 if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => initDashboardRuntime(), { once: true }); else initDashboardRuntime(); }
