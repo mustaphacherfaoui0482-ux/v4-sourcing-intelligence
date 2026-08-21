@@ -42,6 +42,7 @@ export function buildRadarOpportunity(input = {}) {
     easeOfTest: dimensions.easeOfTest,
     dataConfidence: dimensions.dataConfidence ?? productSignals.confidence ?? supplierFactors.dataConfidence,
     supplier: supplier.result ?? supplier,
+    suppliers: input.suppliers,
     economics,
     evidence: input.evidence,
     createdAt: input.createdAt,
