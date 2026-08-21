@@ -192,6 +192,36 @@ function updateCostBreakdown(costBreakdown, landedCost) {
   rows.slice(normalized.length).forEach((row) => row.remove());
 }
 
+function updateRadar(opportunity) {
+  const radar = document.querySelector('.radar svg');
+  if (!radar || !opportunity?.dimensions) return;
+
+  const d = opportunity.dimensions;
+  const values = [
+    Number(d.landedCost) || 0,
+    Number(d.dataConfidence) || 0,
+    Number(d.easeOfTest) || 0,
+    Number(opportunity.scoreBreakdown?.sourcing ?? d.availability) || 0,
+    100 - (Number(d.risk) || 0),
+  ].map((value) => Math.max(0, Math.min(100, value)));
+
+  const center = { x: 110, y: 94 };
+  const outer = [
+    { x: 110, y: 15 },
+    { x: 181, y: 68 },
+    { x: 154, y: 151 },
+    { x: 66, y: 151 },
+    { x: 39, y: 68 },
+  ];
+  const polygon = values.map((value, index) => {
+    const ratio = value / 100;
+    return `${(center.x + (outer[index].x - center.x) * ratio).toFixed(1)},${(center.y + (outer[index].y - center.y) * ratio).toFixed(1)}`;
+  }).join(' ');
+
+  const shape = radar.querySelector('g[fill="#79df31"] polygon');
+  if (shape) shape.setAttribute('points', polygon);
+}
+
 function updateSignals(opportunity) {
   const signals = [...document.querySelectorAll('.signals .sig')];
   if (signals.length < 5) return;
@@ -233,6 +263,7 @@ export function initDashboardRuntime(opportunity = DEMO_OPPORTUNITY) {
   updatePhone(viewModel);
   updateCostAdvice(state.economics);
   updateCostBreakdown(opportunity.offer?.costBreakdown, opportunity.offer?.landedCost);
+  updateRadar(state.opportunity);
   updateSignals(state.opportunity);
   wireActions(state);
 
