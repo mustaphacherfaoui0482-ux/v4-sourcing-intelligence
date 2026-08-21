@@ -257,13 +257,105 @@ La formation doit au contraire exploiter les briques V4 déjà prévues lorsque 
 
 ---
 
-## 10. CHECKPOINT INITIAL
+## 10. FUSION MÉTHODOLOGIQUE VALIDÉE — 21 AOÛT 2026
 
-**État :** Formation E-commerce initialisée.
+Le nouveau cadre opérationnel fourni par l'utilisateur est désormais fusionné avec la méthode V4. Il devient la charte méthodologique de la Formation E-commerce, tandis que V4 Sourcing Intelligence reste le système de pilotage et de décision.
 
-**Prochaine action obligatoire :** répondre aux 7 questions de cadrage avant de choisir une stratégie produit ou acquisition.
+### Principes ajoutés
 
-**Point de contrôle :** aucune hypothèse de produit, cible, budget ou canal ne doit être considérée comme validée tant que les données nécessaires ne sont pas disponibles.
+- distinguer systématiquement **faits, estimations et hypothèses** ;
+- attribuer un **niveau de confiance** aux conclusions lorsque les données sont incomplètes ;
+- ne jamais promettre un ROI positif en 30 jours ;
+- considérer les 30 jours comme une période de validation et d'optimisation ;
+- analyser les relations entre KPI et non les KPI isolément ;
+- avant scaling, vérifier les **unit economics** : prix, coût produit, packaging, transport, importation, frais de paiement, TVA lorsque pertinente, frais variables et CAC ;
+- pour chaque test : hypothèse, variable, contrôle si pertinent, métrique principale, volume/durée minimale, critère de réussite et critère d'arrêt ;
+- privilégier l'action à fort impact et faible complexité ;
+- pouvoir recommander de corriger, pivoter ou arrêter lorsque les données sont négatives.
+
+### Frameworks complémentaires disponibles
+
+- Jobs To Be Done
+- Value Proposition Canvas
+- SWOT
+- ICE
+- RICE
+- Funnel Analysis
+- Cohort Analysis
+- Unit Economics
+
+Ils ne doivent être utilisés que lorsqu'ils apportent une valeur analytique réelle.
+
+### Structure de décision standard
+
+**SITUATION → HYPOTHÈSES → ANALYSE → RISQUES → OPTIONS → RECOMMANDATION → ACTION → CRITÈRE DE VALIDATION**
+
+### Pipeline produit renforcé
+
+**SIGNAL → HYPOTHÈSE → PREUVE → FILTRE → SCORE → SOURCING → UNIT ECONOMICS → TEST → MESURE → DÉCISION**
+
+Le pipeline de sélection conserve la logique Large Radar :
+
+**20–30 candidats → 10 → 5 → 3 → 1**
+
+Mais aucun candidat ne doit recevoir un statut de produit gagnant avant d'avoir des preuves suffisantes.
+
+### Profil de formation actuellement établi
+
+- Budget total : **1 000 €**
+- Niveau : **débutant dans les 7 domaines**
+- Expérience e-commerce : **aucune**
+- Temps disponible : **4 h/jour ou plus**
+- Produit : **à trouver**
+- Marchés envisagés : **France + Algérie**
+- Priorité géographique : **à déterminer par analyse**
+
+### Décisions déjà prises
+
+- méthode : **Demand First** ;
+- collecte : **Large Radar** ;
+- sélection : **quantitative d'abord** ;
+- audit : **par lots de 5** ;
+- Lot 1 : analysé ;
+- Lot 2 : prochaine étape ;
+- V4 : **scoring + garde-fous** ;
+- Plan 30 jours : **validation et optimisation, sans garantie de résultat**.
+
+---
+
+## 11. PLAN 30 JOURS — INTÉGRATION DASHBOARD
+
+La Formation E-commerce doit être intégrée au **Plan 30 jours du parcours opérationnel**. Les 7 questions de cadrage constituent le point d'entrée du parcours et leurs réponses peuvent alimenter le profil utilisateur et les actions suivantes.
+
+Flux cible :
+
+**QUESTION → PROFIL → TÂCHE DU JOUR → DONNÉES → SCORE → DÉCISION → ACTION**
+
+Structure de référence :
+
+- J1–J2 : cadrage et 7 questions ;
+- J3–J5 : marché et critères V4 ;
+- J6–J9 : Demand First et Large Radar ;
+- J10–J12 : 20–30 candidats vers 10 ;
+- J13–J16 : validation demande et concurrence ;
+- J17–J20 : sourcing, MOQ et coût rendu ;
+- J21–J23 : offre, USP et pricing ;
+- J24–J26 : boutique / landing page ;
+- J27–J28 : acquisition et premier test ;
+- J29 : KPI et diagnostic ;
+- J30 : décision V4 et prochaine action.
+
+Cette structure est une **architecture de parcours**, pas une garantie de réalisation ou de rentabilité dans les délais indiqués.
+
+---
+
+## 12. CHECKPOINT ACTUEL
+
+**État :** Formation E-commerce fusionnée méthodologiquement avec V4 et reliée au Plan 30 jours.
+
+**Position de travail :** audit produit par lots de 5.
+
+**Prochaine action :** Lot 2, candidats 6 à 10, avec le nouveau standard de preuve et de confiance des données.
 
 ---
 
