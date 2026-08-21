@@ -2,7 +2,7 @@
 
 ## Statut
 
-**GO officiel — méthode verrouillée. Contract DRAFT créé. Initial repository audit completed. Production code untouched. Guardrails contractuels ajoutés.**
+**GO officiel — méthode verrouillée. Canonical Opportunity Contract V0.4 DRAFT mis à jour avec les garde-fous. Initial repository audit completed. Production code untouched.**
 
 ## Ce qui est verrouillé
 
@@ -50,18 +50,12 @@ Le fichier normatif est :
 
 `docs/CANONICAL-OPPORTUNITY-CONTRACT-V0.4.md`
 
-Les garde-fous détaillés sont enregistrés dans :
-
-`docs/CANONICAL-OPPORTUNITY-CONTRACT-V0.4-GUARDRAILS.md`
-
-Ils sont destinés à être intégrés au contrat canonique avant son passage à `AUTHORITATIVE`.
-
 Identité :
 
 - `contractId = CANONICAL-OPPORTUNITY`
 - `contractVersion = 0.4`
 - `schemaVersion = 0.4.0`
-- statut initial : `DRAFT`
+- statut actuel : `DRAFT`
 
 Cycle :
 
@@ -70,6 +64,8 @@ Cycle :
 Une évolution suit :
 
 `CHANGE PROPOSAL → IMPACT ANALYSIS → NEW CONTRACT VERSION → MIGRATION PLAN → VALIDATION → AUTHORITATIVE`
+
+Le contrat V0.4 est maintenant la **cible normative DRAFT**. Les garde-fous ont été intégrés directement dans les 22 sections ; ils ne constituent pas une nouvelle fonctionnalité ni une section contractuelle supplémentaire.
 
 ## STOP CODE
 
@@ -147,6 +143,25 @@ Le document contractuel couvre 22 sections :
 21. Validation & Testing
 22. Non-Goals
 
+## Garde-fous intégrés au contrat
+
+Les 12 garde-fous sont maintenant intégrés au document canonique :
+
+1. provenance valeur par valeur ;
+2. séparation verification/freshness ;
+3. états Evidence `NOT_FOUND / UNKNOWN / UNVERIFIED / CONFLICTING / VERIFIED` ;
+4. unités explicites ;
+5. sémantique stricte des timestamps ;
+6. dépendances de calcul traçables ;
+7. immutabilité sélective ;
+8. conservation historique non destructive ;
+9. référence temporelle `asOf` ;
+10. idempotence ;
+11. interdiction des magic defaults ;
+12. conservation sémantique lors des migrations.
+
+Ces garde-fous ne sont pas des fonctionnalités : ils protègent la cohérence, l'auditabilité, le déterminisme et la migration du contrat.
+
 ## Initial repository audit — terminé sur le premier périmètre
 
 Audit détaillé : `docs/AUDIT-V0.4-TARGET-ACTUAL-INITIAL.md`
@@ -172,25 +187,6 @@ Audit détaillé : `docs/AUDIT-V0.4-TARGET-ACTUAL-INITIAL.md`
 - Legacy schema utilise encore `scoreV4`, `confidence`, `risks` et `decision` sous `analysis`.
 - History conserve actuellement `score`, `decision` et `confidence`, sans modèle Prediction/Result/Delta V0.4.
 
-## Nouvelles protections ajoutées avant finalisation du contrat
-
-Les 12 garde-fous sont maintenant formalisés dans l'addendum contractuel :
-
-1. provenance valeur par valeur ;
-2. séparation verification/freshness ;
-3. états Evidence `NOT_FOUND / UNKNOWN / UNVERIFIED / CONFLICTING / VERIFIED` ;
-4. unités explicites ;
-5. sémantique stricte des timestamps ;
-6. dépendances de calcul traçables ;
-7. immutabilité sélective ;
-8. conservation historique non destructive ;
-9. référence temporelle `asOf` ;
-10. idempotence ;
-11. interdiction des magic defaults ;
-12. conservation sémantique lors des migrations.
-
-Aucun moteur de production n'a été modifié pour ajouter ces protections.
-
 ## Non-goals immédiats
 
 Pas de :
@@ -208,15 +204,17 @@ Pas de :
 
 ## Prochaine étape
 
-**Intégrer les garde-fous au contrat canonique, puis compléter l'audit du dépôt réel**, notamment Risk, Evidence/Confidence, tests, configuration et historique complet.
+**STOP AJOUTS.** Le cadre contractuel est maintenant suffisamment complet.
 
-Produire ensuite :
+Prochaine séquence obligatoire :
 
-1. Gap Register complet ;
-2. Ownership Matrix validée ;
-3. Read/Write Matrix validée ;
-4. Migration Plan ;
-5. Test Plan.
+1. compléter l'audit exhaustif du dépôt réel ;
+2. produire le Gap Register complet ;
+3. valider Ownership Matrix ;
+4. valider Read/Write Matrix ;
+5. produire Migration Plan ;
+6. produire Test Plan ;
+7. seulement après validation, commencer les modifications de production.
 
 **Aucune modification de moteur de production avant ces étapes.**
 
@@ -224,4 +222,4 @@ Produire ensuite :
 
 État de départ : commit `30292cd01fdeb895bcf304d1b71445255e10f83e` sur `main`.
 
-Les modifications de cette branche restent **documentaires uniquement** : contrat, garde-fous, Master et checkpoint/audit. Aucun moteur de production n'a été modifié.
+Le travail de cette branche reste **documentaire uniquement** : contrat, gouvernance, Master et checkpoint/audit. Aucun moteur de production n'a été modifié.
