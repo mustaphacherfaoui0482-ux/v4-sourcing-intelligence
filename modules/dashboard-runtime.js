@@ -53,24 +53,18 @@ function updateCostBreakdown(costBreakdown, landedCost) { const donut = document
 function updateRadar(opportunity) { const radar = document.querySelector('.radar svg'); if (!radar || !opportunity?.dimensions) return; const d = opportunity.dimensions; const values = [Number(d.landedCostScore) || 0, Number(d.dataConfidence) || 0, Number(d.easeOfTest) || 0, Number(opportunity.scoreBreakdown?.sourcing ?? d.availability) || 0, 100 - (Number(d.risk) || 0)].map((value) => Math.max(0, Math.min(100, value))); const center = { x: 110, y: 94 }; const outer = [{ x: 110, y: 15 }, { x: 181, y: 68 }, { x: 154, y: 151 }, { x: 66, y: 151 }, { x: 39, y: 68 }]; const polygon = values.map((value, index) => { const ratio = value / 100; return `${(center.x + (outer[index].x - center.x) * ratio).toFixed(1)},${(center.y + (outer[index].y - center.y) * ratio).toFixed(1)}`; }).join(' '); const shape = radar.querySelector('g[fill="#79df31"] polygon'); if (shape) shape.setAttribute('points', polygon); }
 function updateSignals(opportunity) { const signals = [...document.querySelectorAll('.signals .sig')]; if (signals.length < 5) return; const d = opportunity.dimensions ?? {}; setText(signals[0].querySelector('span'), `Demande : ${Number(d.demand) || 0}/100`); setText(signals[1].querySelector('span'), `Marge : ${percent(d.margin)}`); setText(signals[2].querySelector('span'), `Confiance données : ${Number(d.dataConfidence) || 0}/100`); setText(signals[3].querySelector('span'), `Risque : ${Number(d.risk) || 0}/100`); setText(signals[4].querySelector('span'), `Sourcing : ${Number(opportunity.scoreBreakdown?.sourcing ?? d.availability) || 0}/100`); }
 function updateSuppliers(suppliers) {
-  const table = [...document.querySelectorAll('.table')].find((node) => /fournisseur/i.test(node.textContent) || node.querySelector('th'));
+  const table = [...document.querySelectorAll('.table')].find((node) => /Comparaison des fournisseurs/i.test(node.closest('.panel')?.textContent ?? ''));
   if (!table || !Array.isArray(suppliers)) return;
-  let tbody = table.querySelector('tbody');
-  if (!tbody) { tbody = document.createElement('tbody'); table.appendChild(tbody); }
+  const tbody = table.querySelector('tbody');
+  if (!tbody) return;
   tbody.textContent = '';
-  suppliers.forEach((supplier) => {
+  suppliers.forEach((supplier, index) => {
     const row = document.createElement('tr');
-    const verification = supplier.verificationStatus === 'verified' ? 'Vérifié' : supplier.verificationStatus === 'rejected' ? 'Rejeté' : 'À vérifier';
-    const cells = [
-      supplier.name ?? '—',
-      money(supplier.unitPrice),
-      `${Number(supplier.moq) || 0}`,
-      `${Number(supplier.gsm) || 0} GSM`,
-      `${Number(supplier.leadTimeDays) || 0} j`,
-      `<span class="score">${Math.round(Number(supplier.score) || 0)}</span>`,
-    ];
-    cells.forEach((value, index) => { const cell = document.createElement('td'); if (index === 5) cell.innerHTML = value; else cell.textContent = value; row.appendChild(cell); });
-    row.title = `${supplier.composition ?? ''} · ${supplier.customization ? 'Personnalisation' : 'Sans personnalisation'} · ${verification}`;
+    const landed = (Number(supplier.unitPrice) || 0) + (Number(supplier.shippingCost) || 0);
+    const quality = Number(supplier.score) >= 90 ? '★★★★★' : Number(supplier.score) >= 80 ? '★★★★☆' : '★★★☆☆';
+    const cells = [String(index + 1), supplier.name ?? '—', supplier.country === 'CN' ? '🇨🇳' : (supplier.country ?? '—'), money(landed), `${Number(supplier.moq) || 0} pcs`, `${Number(supplier.leadTimeDays) || 0} j`, quality, Math.round(Number(supplier.score) || 0)];
+    cells.forEach((value, cellIndex) => { const cell = document.createElement('td'); if (cellIndex === 1) { const name = document.createElement('b'); name.textContent = value; cell.appendChild(name); } else if (cellIndex === 6) { cell.className = 'stars'; cell.textContent = value; } else if (cellIndex === 7) { const score = document.createElement('span'); score.className = 'score'; score.textContent = value; cell.appendChild(score); } else cell.textContent = value; row.appendChild(cell); });
+    row.title = `${supplier.composition ?? ''} · ${supplier.customization ? 'Personnalisation' : 'Sans personnalisation'} · ${supplier.verificationStatus === 'verified' ? 'Vérifié' : supplier.verificationStatus === 'rejected' ? 'Rejeté' : 'À vérifier'}`;
     tbody.appendChild(row);
   });
 }
