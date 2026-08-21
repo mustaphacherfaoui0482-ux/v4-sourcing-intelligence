@@ -22,6 +22,7 @@ export function createOpportunity(input = {}) {
       dataConfidence: clamp(input.dataConfidence),
     },
     supplier: input.supplier ?? null,
+    suppliers: Array.isArray(input.suppliers) ? input.suppliers : [],
     economics: input.economics ?? null,
     evidence: Array.isArray(input.evidence) ? input.evidence : [],
     createdAt: input.createdAt ?? null,
