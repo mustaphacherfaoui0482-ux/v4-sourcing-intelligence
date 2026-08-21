@@ -1,17 +1,26 @@
 // V4 Analytics Performance Engine v1
-// Metrics layer for monitoring V4 intelligence performance
+// Deterministic metrics layer for monitoring intelligence performance.
 
-class V4AnalyticsPerformanceEngine {
+export class V4AnalyticsPerformanceEngine {
   constructor() {
     this.metrics = [];
   }
 
   recordMetric(name, value, metadata = {}) {
+    if (typeof name !== 'string' || !name.trim()) {
+      throw new TypeError('Metric name must be a non-empty string');
+    }
+
+    const numericValue = Number(value);
+    if (!Number.isFinite(numericValue)) {
+      throw new TypeError(`Metric "${name}" must contain a finite numeric value`);
+    }
+
     const metric = {
       name,
-      value,
-      metadata,
-      timestamp: new Date().toISOString()
+      value: numericValue,
+      metadata: { ...metadata },
+      timestamp: new Date().toISOString(),
     };
 
     this.metrics.push(metric);
@@ -19,13 +28,13 @@ class V4AnalyticsPerformanceEngine {
   }
 
   getMetrics() {
-    return this.metrics;
+    return [...this.metrics];
   }
 
   calculateSuccessRate(results = []) {
-    if (!results.length) return 0;
+    if (!Array.isArray(results) || results.length === 0) return 0;
 
-    const success = results.filter(r => r === 'success').length;
+    const success = results.filter((result) => result === 'success').length;
     return Math.round((success / results.length) * 100);
   }
 
@@ -33,9 +42,9 @@ class V4AnalyticsPerformanceEngine {
     return {
       totalMetrics: this.metrics.length,
       generatedAt: new Date().toISOString(),
-      metrics: this.metrics
+      metrics: [...this.metrics],
     };
   }
 }
 
-module.exports = V4AnalyticsPerformanceEngine;
+export default V4AnalyticsPerformanceEngine;
