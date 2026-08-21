@@ -33,7 +33,7 @@ Il **ne remplace pas le MASTER V4** et ne modifie pas le MASTER. Il conserve l'�
 
 - `modules/dashboard-runtime.js` existe.
 - Le runtime consomme le modèle canonique Opportunity.
-- Le Dashboard possède encore `DEMO_OPPORTUNITY` comme fallback.
+- Le Dashboard conserve `DEMO_OPPORTUNITY` comme fallback.
 - Le bridge Active Opportunity a été ajouté sur la branche de travail.
 - Ordre de priorité du bridge :
 
@@ -41,15 +41,17 @@ Il **ne remplace pas le MASTER V4** et ne modifie pas le MASTER. Il conserve l'�
 
 - Un mécanisme de rafraîchissement du runtime a été ajouté.
 - Le runtime expose son état via `window.V4SourcingRuntime`.
+- Une correction a été intégrée directement dans la branche active pour que le coût rendu affiché par le KPI/mobile provienne de `economics.inputs.landedCost`, et non de la dimension de scoring `dimensions.landedCost`.
 - Le design existant n'a pas été volontairement refondu.
 
 ### Déploiement / GitHub / Vercel
 
 - La branche `feat/dashboard-cost-breakdown-runtime` existe.
-- Le travail de runtime a été poussé sur cette branche.
-- Un preview Vercel a été observé en état `READY` lors de la vérification précédente.
-- `main` n'a pas été déclaré finalisé à ce checkpoint.
-- Le checkpoint Runtime V1 existant confirme déjà que la validation finale doit passer par l'ouverture du déploiement dans un navigateur et la comparaison avec l'Opportunity canonique.
+- Le PR #6 reste ouvert et pointe maintenant sur le commit `087eb82bbbcc017683757da0fded90737542ed9a`.
+- Le commit finalisé de la correction runtime a généré un preview Vercel **READY** : `dpl_8UsYa5VUK12xVBcFLKRCyAwZrjMj`.
+- Les deux checks Vercel associés au commit sont en état **success**.
+- Le PR #7, qui portait séparément la correction du landed cost, a été fermé car sa correction a été intégrée directement dans la branche active.
+- `main` n'a pas été fusionné à ce stade.
 
 ---
 
@@ -60,7 +62,7 @@ Il **ne remplace pas le MASTER V4** et ne modifie pas le MASTER. Il conserve l'�
 - Pas de nouvelle infrastructure de base de données.
 - Pas de déplacement du scoring hors du Radar Scoring Engine.
 - Pas de remplacement inutile de l'architecture existante.
-- Pas de fusion vers `main` tant que la validation finale n'est pas prouvée.
+- Pas de fusion vers `main` tant que la validation finale dans le navigateur n'est pas prouvée.
 
 ---
 
@@ -68,11 +70,13 @@ Il **ne remplace pas le MASTER V4** et ne modifie pas le MASTER. Il conserve l'�
 
 ### A — Validation navigateur / preview
 
-- [ ] Ouvrir le preview Vercel dans un navigateur.
+- [ ] Ouvrir le dernier preview Vercel dans un navigateur.
 - [ ] Vérifier que le Dashboard se charge correctement.
 - [ ] Vérifier que le runtime est effectivement exécuté.
 - [ ] Vérifier que `V4SourcingRuntime` est disponible et prêt.
 - [ ] Vérifier l'absence d'erreurs JavaScript dans la console.
+
+**Limitation actuelle :** l'environnement de travail ne fournit pas actuellement un contrôle navigateur interactif exploitable. Je ne peux donc pas déclarer cette validation comme réussie sur la seule base du statut Vercel READY.
 
 ### B — Validation du flux Opportunity
 
@@ -93,14 +97,15 @@ Il **ne remplace pas le MASTER V4** et ne modifie pas le MASTER. Il conserve l'�
 
 ### D — Validation GitHub / CI
 
-- [ ] Vérifier le PR de la branche de travail.
-- [ ] Vérifier les contrôles CI disponibles.
-- [ ] Vérifier le diff final.
+- [x] Vérifier le PR de la branche de travail : PR #6 ouvert et mergeable.
+- [x] Vérifier les checks Vercel disponibles : success sur le commit `087eb82bbbcc017683757da0fded90737542ed9a`.
+- [x] Vérifier que la correction landed-cost est intégrée à la branche active.
+- [ ] Vérifier le diff final complet avant fusion.
 - [ ] Vérifier qu'aucune modification parasite n'a été introduite.
 
 ### E — Finalisation Vercel
 
-- [ ] Si toutes les validations sont positives, fusionner vers `main`.
+- [ ] Après validation navigateur/visuelle positive, fusionner PR #6 vers `main`.
 - [ ] Vérifier le nouveau déploiement de production.
 - [ ] Vérifier que la production correspond exactement au code validé.
 - [ ] Effectuer un dernier contrôle fonctionnel.
@@ -153,6 +158,6 @@ Tant qu'un de ces éléments reste non vérifié, le statut doit rester :
 
 ## 8. POINT DE REPRISE EXACT
 
-**Reprendre directement à la validation navigateur du preview Vercel, puis exécuter automatiquement toutes les tâches restantes de ce checkpoint jusqu'à la finalisation, sans demander d'accord intermédiaire.**
+**Reprendre directement à la validation navigateur du dernier preview Vercel, puis exécuter automatiquement toutes les tâches restantes de ce checkpoint jusqu'à la finalisation, sans demander d'accord intermédiaire.**
 
 Aucune étape déjà validée ne doit être recommencée sans raison.
