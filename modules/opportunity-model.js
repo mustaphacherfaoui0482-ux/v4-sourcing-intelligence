@@ -17,6 +17,7 @@ export function createOpportunity(input = {}) {
       margin: clamp(input.margin),
       availability: clamp(input.availability),
       landedCost: clamp(input.landedCost),
+      landedCostScore: clamp(input.landedCostScore),
       risk: clamp(input.risk),
       easeOfTest: clamp(input.easeOfTest),
       dataConfidence: clamp(input.dataConfidence),
