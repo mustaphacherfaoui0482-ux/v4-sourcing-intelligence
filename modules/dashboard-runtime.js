@@ -51,16 +51,29 @@ function updatePhone(viewModel) { const phone = document.querySelector('.phone')
 function updateCostAdvice(economics) { const advice = document.querySelector('.advice'); if (!advice) return; const status = economics.status === 'healthy' ? 'Économie saine.' : economics.status === 'thin_margin' ? 'Marge trop fine pour la cible.' : 'Économie déficitaire.'; advice.textContent = ''; const prefix = document.createTextNode('💡 Diagnostic : '); const statusNode = document.createElement('b'); statusNode.textContent = status; const suffix = document.createTextNode(` Contribution après acquisition : ${money(economics.contributionAfterAds)} par commande.`); advice.append(prefix, statusNode, suffix); }
 function updateCostBreakdown(costBreakdown, landedCost) { const donut = document.querySelector('.donut'); const rows = [...document.querySelectorAll('.cost div')]; if (!donut || !rows.length || !Array.isArray(costBreakdown) || !costBreakdown.length) return; const total = Number(landedCost) || costBreakdown.reduce((sum, item) => sum + (Number(item.value) || 0), 0); const normalized = costBreakdown.map((item) => ({ label: item.label, value: Math.max(0, Number(item.value) || 0) })); const sum = normalized.reduce((acc, item) => acc + item.value, 0); if (!sum) return; const stops = []; let cursor = 0; const palette = ['#3b82f6', '#3bc7c5', '#55c79b', '#f59e0b', '#f97316', '#8b5cf6']; normalized.forEach((item, index) => { const share = (item.value / sum) * 100; stops.push(`${palette[index % palette.length]} ${cursor}% ${cursor + share}%`); cursor += share; }); donut.style.background = `conic-gradient(${stops.join(',')})`; setText(donut.querySelector('b'), money(total)); normalized.forEach((item, index) => { const row = rows[index]; if (!row) return; setText(row.querySelector('span'), item.label); setText(row.querySelector('b'), `${money(item.value)}  ${percent((item.value / sum) * 100)}`); }); rows.slice(normalized.length).forEach((row) => row.remove()); }
 function updateRadar(opportunity) { const radar = document.querySelector('.radar svg'); if (!radar || !opportunity?.dimensions) return; const d = opportunity.dimensions; const values = [Number(d.landedCostScore) || 0, Number(d.dataConfidence) || 0, Number(d.easeOfTest) || 0, Number(opportunity.scoreBreakdown?.sourcing ?? d.availability) || 0, 100 - (Number(d.risk) || 0)].map((value) => Math.max(0, Math.min(100, value))); const center = { x: 110, y: 94 }; const outer = [{ x: 110, y: 15 }, { x: 181, y: 68 }, { x: 154, y: 151 }, { x: 66, y: 151 }, { x: 39, y: 68 }]; const polygon = values.map((value, index) => { const ratio = value / 100; return `${(center.x + (outer[index].x - center.x) * ratio).toFixed(1)},${(center.y + (outer[index].y - center.y) * ratio).toFixed(1)}`; }).join(' '); const shape = radar.querySelector('g[fill="#79df31"] polygon'); if (shape) shape.setAttribute('points', polygon); }
-function updateSignals(opportunity) {
-  const signals = [...document.querySelectorAll('.signals .sig')];
-  if (signals.length < 5) return;
-  const d = opportunity.dimensions ?? {};
-  setText(signals[0].querySelector('span'), `Demande : ${Number(d.demand) || 0}/100`);
-  setText(signals[1].querySelector('span'), `Marge : ${percent(d.margin)}`);
-  setText(signals[2].querySelector('span'), `Confiance données : ${Number(d.dataConfidence) || 0}/100`);
-  setText(signals[3].querySelector('span'), `Risque : ${Number(d.risk) || 0}/100`);
-  setText(signals[4].querySelector('span'), `Sourcing : ${Number(opportunity.scoreBreakdown?.sourcing ?? d.availability) || 0}/100`);
+function updateSignals(opportunity) { const signals = [...document.querySelectorAll('.signals .sig')]; if (signals.length < 5) return; const d = opportunity.dimensions ?? {}; setText(signals[0].querySelector('span'), `Demande : ${Number(d.demand) || 0}/100`); setText(signals[1].querySelector('span'), `Marge : ${percent(d.margin)}`); setText(signals[2].querySelector('span'), `Confiance données : ${Number(d.dataConfidence) || 0}/100`); setText(signals[3].querySelector('span'), `Risque : ${Number(d.risk) || 0}/100`); setText(signals[4].querySelector('span'), `Sourcing : ${Number(opportunity.scoreBreakdown?.sourcing ?? d.availability) || 0}/100`); }
+function updateSuppliers(suppliers) {
+  const table = [...document.querySelectorAll('.table')].find((node) => /fournisseur/i.test(node.textContent) || node.querySelector('th'));
+  if (!table || !Array.isArray(suppliers)) return;
+  let tbody = table.querySelector('tbody');
+  if (!tbody) { tbody = document.createElement('tbody'); table.appendChild(tbody); }
+  tbody.textContent = '';
+  suppliers.forEach((supplier) => {
+    const row = document.createElement('tr');
+    const verification = supplier.verificationStatus === 'verified' ? 'Vérifié' : supplier.verificationStatus === 'rejected' ? 'Rejeté' : 'À vérifier';
+    const cells = [
+      supplier.name ?? '—',
+      money(supplier.unitPrice),
+      `${Number(supplier.moq) || 0}`,
+      `${Number(supplier.gsm) || 0} GSM`,
+      `${Number(supplier.leadTimeDays) || 0} j`,
+      `<span class="score">${Math.round(Number(supplier.score) || 0)}</span>`,
+    ];
+    cells.forEach((value, index) => { const cell = document.createElement('td'); if (index === 5) cell.innerHTML = value; else cell.textContent = value; row.appendChild(cell); });
+    row.title = `${supplier.composition ?? ''} · ${supplier.customization ? 'Personnalisation' : 'Sans personnalisation'} · ${verification}`;
+    tbody.appendChild(row);
+  });
 }
 function wireActions(state) { const exportButton = [...document.querySelectorAll('button')].find((button) => button.textContent.includes('Exporter le rapport')); if (!exportButton) return; exportButton.addEventListener('click', () => { const report = { product: state.opportunity.product, score: state.opportunity.score, decision: state.opportunity.decision, reason: state.opportunity.decisionReason, economics: state.economics, generatedAt: new Date().toISOString() }; const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'v4-sourcing-intelligence-report.json'; anchor.click(); URL.revokeObjectURL(url); }, { once: true }); }
-export function initDashboardRuntime(opportunity = DEMO_OPPORTUNITY) { const state = calculateDashboardState(opportunity); const { viewModel } = state; updateKpis(viewModel); updatePhone(viewModel); updateCostAdvice(state.economics); updateCostBreakdown(opportunity.offer?.costBreakdown, opportunity.offer?.landedCost); updateRadar(state.opportunity); updateSignals(state.opportunity); wireActions(state); document.documentElement.dataset.v4Runtime = 'ready'; window.V4SourcingRuntime = Object.freeze(state); return state; }
+export function initDashboardRuntime(opportunity = DEMO_OPPORTUNITY) { const state = calculateDashboardState(opportunity); const { viewModel } = state; updateKpis(viewModel); updatePhone(viewModel); updateCostAdvice(state.economics); updateCostBreakdown(opportunity.offer?.costBreakdown, opportunity.offer?.landedCost); updateRadar(state.opportunity); updateSignals(state.opportunity); updateSuppliers(state.opportunity.suppliers); wireActions(state); document.documentElement.dataset.v4Runtime = 'ready'; window.V4SourcingRuntime = Object.freeze(state); return state; }
 if (typeof document !== 'undefined') { if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => initDashboardRuntime(), { once: true }); else initDashboardRuntime(); }
