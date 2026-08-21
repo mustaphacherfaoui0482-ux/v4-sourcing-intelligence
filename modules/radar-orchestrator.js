@@ -38,6 +38,7 @@ export function buildRadarOpportunity(input = {}) {
     margin: dimensions.margin ?? economics.netContributionMargin ?? productSignals.profitability,
     availability: dimensions.availability,
     landedCost: dimensions.landedCost,
+    landedCostScore: dimensions.landedCostScore,
     risk: dimensions.risk ?? risk.riskScore,
     easeOfTest: dimensions.easeOfTest,
     dataConfidence: dimensions.dataConfidence ?? productSignals.confidence ?? supplierFactors.dataConfidence,
