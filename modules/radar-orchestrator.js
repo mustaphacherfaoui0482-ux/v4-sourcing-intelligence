@@ -1,9 +1,11 @@
 /**
- * V4 Sourcing Intelligence — Radar Orchestrator v2
+ * V4 Sourcing Intelligence — Radar Orchestrator v3
  * Coordinates existing deterministic engines without duplicating scoring or decision logic.
+ * Compatibility layer: the existing Radar Scoring Engine remains the single scoring authority.
  */
 
 import { createOpportunity } from './opportunity-model.js';
+import { calculateRadarScore } from './radar-scoring-engine.js';
 
 export function buildRadarOpportunity(input = {}) {
   const product = input.productIntelligence ?? {};
@@ -11,11 +13,20 @@ export function buildRadarOpportunity(input = {}) {
   const risk = input.risk ?? {};
   const economics = input.economics ?? {};
   const dimensions = input.dimensions ?? {};
-  const radarScore = input.radarScore ?? null;
   const decision = input.decision ?? null;
 
   const productSignals = product.signals ?? product.factors ?? product;
   const supplierFactors = supplier.factors ?? supplier;
+
+  const radarSignals = input.radarSignals ?? {
+    demand: productSignals.demand,
+    marketing: productSignals.marketing,
+    sourcing: productSignals.sourcing,
+    profitability: productSignals.profitability ?? economics.netContributionMargin,
+    confidence: productSignals.confidence ?? supplierFactors.dataConfidence,
+  };
+
+  const radarScore = calculateRadarScore(radarSignals);
 
   const opportunity = createOpportunity({
     id: input.id,
@@ -38,9 +49,9 @@ export function buildRadarOpportunity(input = {}) {
 
   return {
     ...opportunity,
-    score: Number.isFinite(Number(radarScore?.total)) ? Number(radarScore.total) : null,
-    scoreBreakdown: radarScore?.breakdown ?? null,
-    scoreStatus: radarScore?.status ?? null,
+    score: radarScore.total,
+    scoreBreakdown: radarScore.breakdown,
+    scoreStatus: radarScore.status,
     decision: decision?.decision ?? null,
     decisionReason: decision?.reason ?? null,
   };
