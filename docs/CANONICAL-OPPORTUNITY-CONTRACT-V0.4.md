@@ -60,13 +60,19 @@ The orchestrator may transport an Opportunity during execution but is not the ow
 ## 05. Field Definitions
 
 ### identity
-Stable identity and source-independent identifiers required to track the Opportunity over time.
+Stable identity and source-independent identifiers required to track the Opportunity over time. Identity generation must be deterministic under the declared identity inputs and configuration.
 
 ### signals[]
 Raw or normalized market/sourcing signals detected by Radar.
 
 ### evidence[]
-Documented evidence supporting claims or inputs. Evidence may carry provenance, freshness, verification state and source reference.
+Documented evidence supporting claims or inputs. Each important evidence item must carry sufficient provenance to be auditable and must distinguish verification from freshness.
+
+Evidence status is explicit:
+
+`NOT_FOUND · UNKNOWN · UNVERIFIED · CONFLICTING · VERIFIED`
+
+`NOT_FOUND` is absence of supporting evidence, not negative proof. `CONFLICTING` means relevant sources disagree and must not be silently averaged into a false consensus.
 
 ### confidence
 Reliability of the analysis/data, not attractiveness of the Opportunity.
@@ -80,6 +86,8 @@ confidence
 ├── version
 └── calculatedAt
 ```
+
+Verification and freshness are independent dimensions. `verified = true` does not imply high freshness.
 
 ### potential
 Assessment of opportunity potential. It must not silently absorb confidence.
@@ -98,6 +106,8 @@ Real financial values, not an abstract economics score.
 Minimum conceptual fields:
 
 `sellingPrice`, `landedCost`, `variableCosts`, `CAC`, `contribution`, `contributionMargin`, `minimumSellingPrice`, `maxCAC`, `ROASBreakEven`, `status`.
+
+Where quantitative units are meaningful, values must carry explicit units/currency and must not rely on silent inference from field names.
 
 ### risk
 Structured risks and gates. Risk is not merely a score deduction.
@@ -125,7 +135,7 @@ decision
 ```
 
 ### action[]
-Concrete user actions owned by the Action domain, not embedded as a second decision system.
+Concrete user actions owned by the Action domain, not embedded as a second decision system. Current operational action state is mutable unless otherwise versioned by its own contract.
 
 ### prediction
 Immutable snapshot of the analysis used for a test/decision.
@@ -186,6 +196,16 @@ A consumer may not recalculate a canonical value simply because it can read its 
 9. `delta` is derived from Prediction + Result and is not a primary source of truth.
 10. Missing information must never be silently converted into a negative factual value.
 11. No engine may silently modify a canonical value owned by another engine.
+12. Verification and freshness are distinct and independently representable.
+13. Evidence status distinguishes absence, uncertainty, lack of verification, contradiction and verification.
+14. Relevant quantitative values must carry explicit units and currency.
+15. `collectedAt`, `calculatedAt`, `updatedAt`, `startedAt`, `endedAt` and `asOf` have distinct semantics.
+16. Derived calculations must expose or reference their declared dependencies.
+17. Lifecycle class is explicit: `IMMUTABLE`, `VERSIONED` or `MUTABLE`.
+18. Historical evaluations required for audit must not be destructively deleted merely because a newer evaluation exists.
+19. Deterministic operations declared idempotent must be safe to repeat without divergent canonical data, duplicate identity or unexplained historical records.
+20. Missing values must not receive undocumented or unversioned magic defaults.
+21. Contract migration must conserve semantic meaning; renaming or moving a field is not proof of equivalence.
 
 ## 09. Null / Unknown Semantics
 
@@ -203,11 +223,15 @@ Example:
 
 `economics.status = INSUFFICIENT_DATA` must not automatically become `DECISION = AVOID`.
 
+Magic defaults are prohibited unless explicitly defined, documented and versioned. For example, absent `CAC` must not silently become `CAC = 0`, and absent `MOQ` must not silently become `MOQ = 1`.
+
 ## 10. Determinism
 
 For a canonical calculation:
 
 > Same declared input + same engineVersion + same configuration + same calculationContext → same result.
+
+Deterministic operations should be idempotent where the contract declares them idempotent, including migration, normalization, calculation, identity generation and validation.
 
 If an external deterministic reference changes, that reference/version must be identifiable so the result can be audited as `DATA_CHANGED`, `ENGINE_CHANGED` or `CONTRACT_CHANGED` rather than treated as unexplained drift.
 
@@ -225,6 +249,8 @@ calculationContext
 └── calculatedAt
 ```
 
+For time-dependent inputs, `asOf` records the effective date/time of the referenced value. `calculatedAt` records when the calculation ran; they are not interchangeable.
+
 References may include versioned shipping, customs, fees, tax, exchange-rate or other economic tables.
 
 ## 12. Engine Contracts
@@ -237,6 +263,20 @@ The Radar detects; Opportunity Engine assembles/normalizes; Evidence documents; 
 
 No engine may silently duplicate another engine's canonical calculation.
 
+### Calculation dependency trace
+
+Derived calculations must expose or reference enough information to answer why the output exists:
+
+```text
+calculation
+├── inputs
+├── outputs
+├── calculationContext
+└── version
+```
+
+Stable canonical references may be used instead of duplicating every input value.
+
 ## 13. Decision Contract
 
 Decision is a recommendation, not another score.
@@ -245,9 +285,9 @@ Required conceptual structure:
 
 ```text
 decision.status
- decision.reason
- decision.blockers[]
- decision.trace[]
+decision.reason
+decision.blockers[]
+decision.trace[]
 ```
 
 Decision states must be explicit and machine-readable. At minimum, the system must be able to represent states such as `INVESTIGATE`, `TEST`, `WAIT`, `AVOID`, `BUY` where the current product rules permit them.
@@ -264,6 +304,8 @@ Decision answers: **what the system recommends.**
 Action answers: **what the user/system must do next.**
 
 Actions should be explicit, actionable and traceable to the decision/blockers.
+
+Current action state may be mutable; historical action states required for audit must be preserved according to the relevant action/history contract.
 
 ## 15. Prediction Contract
 
@@ -312,6 +354,24 @@ Delta may expose differences such as CAC, ROAS, revenue, contribution and outcom
 
 ## 18. Provenance & Versioning
 
+Provenance is required at the level of each important auditable value, not only at the enclosing object.
+
+Where relevant, an auditable value should be traceable through:
+
+```text
+provenance
+├── source
+├── collectedAt
+├── method
+├── currency
+├── reference
+├── verification
+├── freshness
+└── asOf
+```
+
+The exact provenance fields depend on the data type, but omission must be deliberate and contractually justified.
+
 At minimum, trace:
 
 - `contractId`
@@ -320,9 +380,11 @@ At minimum, trace:
 - relevant `engineVersion`
 - `calculationContext`
 - evidence/source provenance where applicable
-- timestamps
+- timestamps with their declared semantics
 
-A result must allow future analysis to distinguish changes in data/reference, engine logic and contract semantics.
+Versioned evaluations such as Potential, Confidence and Risk must be appendable/reconstructable for audit. Historical evaluations must not be destructively removed because a newer engine version exists.
+
+A future analysis must be able to distinguish `DATA_CHANGED`, `ENGINE_CHANGED` and `CONTRACT_CHANGED`.
 
 ## 19. Migration Rules
 
@@ -336,9 +398,14 @@ Every migrated legacy field must have:
 - transformation rule;
 - target owner;
 - compatibility status;
-- deprecation plan.
+- deprecation plan;
+- semantic equivalence evidence where the migration changes name/location/type.
+
+A mapping is not valid merely because two fields have similar names. For example, `dataConfidence → confidence.score` requires proof that the old and new semantics are equivalent.
 
 No permanent legacy alias without a defined deprecation version/date.
+
+Migration must preserve the meaning of the data. Refactoring the location or name of a value must not silently change what the value means.
 
 ## 20. Contract Evolution
 
@@ -351,6 +418,8 @@ Compatibility model:
 A change is **breaking** if it changes the meaning, ownership, type, permissions, invariants or mandatory dependencies of canonical data.
 
 Every breaking change requires impact analysis and migration planning.
+
+No new product functionality is admitted into V0.4 merely by calling it a contract safeguard. Only changes that protect contract coherence, auditability, determinism or migration are in scope.
 
 ## 21. Validation & Testing
 
@@ -370,6 +439,22 @@ Audit findings use stable IDs such as `AUDIT-OPP-001` and should connect:
 
 `CONTRACT → FINDING → MIGRATION → COMMIT → TEST → VERIFIED`
 
+Target and actual must remain separate:
+
+```text
+TARGET = what V0.4 requires
+ACTUAL = what the repository does
+GAP    = demonstrated difference
+```
+
+A finding must never be marked `CONFORME` by intuition. It requires localizable evidence.
+
+Closed GAP taxonomy:
+
+`CONFORME · À_ADAPTER · CONTRADICTORY · DUPLICATED · MISSING · LEGACY · À_SUPPRIMER · UNKNOWN`
+
+`UNKNOWN` means evidence is insufficient; it is not a synonym for probable conformity.
+
 ## 22. Non-Goals
 
 V0.4 does not introduce:
@@ -384,7 +469,8 @@ V0.4 does not introduce:
 - a supplier marketplace;
 - complex automation;
 - duplicated engines;
-- silent contract changes.
+- silent contract changes;
+- new product functionality disguised as governance work.
 
 ## Audit Method — mandatory execution rule
 
@@ -411,6 +497,6 @@ Closed GAP taxonomy:
 
 ## Current Status
 
-**DRAFT — ready for repository confrontation.**
+**DRAFT — guardrails integrated; ready for repository confrontation.**
 
 Production engines must remain unchanged until this specification has been reviewed against the real repository and the resulting gap register, migration plan and test plan have been validated.
