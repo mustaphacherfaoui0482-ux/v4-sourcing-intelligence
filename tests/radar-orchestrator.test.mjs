@@ -1,13 +1,25 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { buildRadarOpportunity } from '../modules/radar-orchestrator.js';
+import { calculateRadarScore } from '../modules/radar-scoring-engine.js';
 
-test('radar orchestrator preserves canonical dimensions and consumes existing score', () => {
+test('radar orchestrator integrates the official scoring engine into the opportunity', () => {
+  const radarSignals = {
+    demand: 85,
+    marketing: 90,
+    sourcing: 80,
+    profitability: 80,
+    confidence: 88,
+  };
+
+  const expectedScore = calculateRadarScore(radarSignals);
+
   const result = buildRadarOpportunity({
     id: 'opp-001',
     product: 'Hoodie DZ Premium',
     source: '1688',
     country: 'CN',
+    radarSignals,
     dimensions: {
       potential: 90,
       demand: 85,
@@ -20,11 +32,6 @@ test('radar orchestrator preserves canonical dimensions and consumes existing sc
     },
     risk: { riskScore: 20 },
     economics: { netContributionMargin: 80 },
-    radarScore: {
-      total: 84,
-      status: 'strong_opportunity',
-      breakdown: { demand: 85, marketing: 90, sourcing: 80, profitability: 80, confidence: 88 },
-    },
     decision: { decision: 'TESTER', reason: 'Opportunité à tester' },
   });
 
@@ -40,16 +47,18 @@ test('radar orchestrator preserves canonical dimensions and consumes existing sc
     easeOfTest: 75,
     dataConfidence: 88,
   });
-  assert.equal(result.score, 84);
-  assert.equal(result.scoreStatus, 'strong_opportunity');
+  assert.equal(result.score, expectedScore.total);
+  assert.deepEqual(result.scoreBreakdown, expectedScore.breakdown);
+  assert.equal(result.scoreStatus, expectedScore.status);
   assert.equal(result.decision, 'TESTER');
 });
 
-test('radar orchestrator does not invent a score when the scoring engine has not run', () => {
+test('radar orchestrator does not invent a score when no scoring input exists', () => {
   const result = buildRadarOpportunity({
     dimensions: { demand: 80, dataConfidence: 90 },
   });
 
-  assert.equal(result.score, null);
+  assert.equal(result.score, 0);
+  assert.equal(result.scoreStatus, 'insufficient_data');
   assert.equal(result.decision, null);
 });
