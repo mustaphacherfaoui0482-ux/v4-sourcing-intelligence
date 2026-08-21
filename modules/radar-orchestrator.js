@@ -46,6 +46,7 @@ export function buildRadarOpportunity(input = {}) {
     suppliers: input.suppliers,
     costBreakdown: input.costBreakdown,
     economics,
+    marketSignals: input.marketSignals,
     evidence: input.evidence,
     createdAt: input.createdAt,
   });
