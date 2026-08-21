@@ -16,6 +16,14 @@ export const DEMO_OPPORTUNITY = Object.freeze({
     targetMargin: 30,
     visitors: 1000,
     conversionRate: 2.5,
+    costBreakdown: [
+      { label: 'Produit (Usine)', value: 3.2 },
+      { label: 'Personnalisation', value: 0.8 },
+      { label: 'Transport int.', value: 1.2 },
+      { label: 'Douane & Taxes', value: 0.6 },
+      { label: 'Transport France', value: 0.7 },
+      { label: 'Autres frais', value: 0.5 },
+    ],
   },
   demandScore: 90,
   sourcingScore: 92,
@@ -147,6 +155,43 @@ function updateCostAdvice(economics) {
   advice.append(prefix, statusNode, suffix);
 }
 
+function updateCostBreakdown(costBreakdown, landedCost) {
+  const donut = document.querySelector('.donut');
+  const rows = [...document.querySelectorAll('.cost div')];
+  if (!donut || !rows.length || !Array.isArray(costBreakdown) || !costBreakdown.length) return;
+
+  const total = Number(landedCost) || costBreakdown.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
+  const normalized = costBreakdown.map((item) => ({
+    label: item.label,
+    value: Math.max(0, Number(item.value) || 0),
+  }));
+  const sum = normalized.reduce((acc, item) => acc + item.value, 0);
+  if (!sum) return;
+
+  const stops = [];
+  let cursor = 0;
+  const palette = ['#3b82f6', '#3bc7c5', '#55c79b', '#f59e0b', '#f97316', '#8b5cf6'];
+  normalized.forEach((item, index) => {
+    const share = (item.value / sum) * 100;
+    stops.push(`${palette[index % palette.length]} ${cursor}% ${cursor + share}%`);
+    cursor += share;
+  });
+  donut.style.background = `conic-gradient(${stops.join(',')})`;
+  setText(donut.querySelector('b'), money(total));
+
+  normalized.forEach((item, index) => {
+    const row = rows[index];
+    if (!row) return;
+    const label = row.querySelector('span');
+    const value = row.querySelector('b');
+    const share = (item.value / sum) * 100;
+    setText(label, item.label);
+    setText(value, `${money(item.value)}  ${percent(share)}`);
+  });
+
+  rows.slice(normalized.length).forEach((row) => row.remove());
+}
+
 function updateSignals(opportunity) {
   const signals = [...document.querySelectorAll('.signals .sig')];
   if (signals.length < 5) return;
@@ -187,6 +232,7 @@ export function initDashboardRuntime(opportunity = DEMO_OPPORTUNITY) {
   updateKpis(viewModel);
   updatePhone(viewModel);
   updateCostAdvice(state.economics);
+  updateCostBreakdown(opportunity.offer?.costBreakdown, opportunity.offer?.landedCost);
   updateSignals(state.opportunity);
   wireActions(state);
 
