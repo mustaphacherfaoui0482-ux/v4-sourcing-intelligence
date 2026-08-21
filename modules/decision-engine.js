@@ -1,6 +1,6 @@
 // V4 Sourcing Intelligence - Decision Engine v2
 // Moteur de décision contrôlable sans IA.
-import '../v4-premium-shell.css';
+// Le moteur reste indépendant du rendu : le CSS est chargé par l'interface, pas par ce module.
 import { evaluateOfferForDecision } from './v4-offer-engine-adapter.js';
 export const DECISIONS={TEST:'TESTER',ANALYZE:'APPROFONDIR',WAIT:'ATTENDRE',REJECT:'EVITER'};
 export function evaluateOpportunity(data={}){
