@@ -2,9 +2,9 @@
 
 ## Statut
 
-**GO officiel — méthode verrouillée.**
+**GO officiel — méthode verrouillée. Contract DRAFT créé. Initial repository audit completed. Production code untouched.**
 
-## Ce qui vient d'être verrouillé
+## Ce qui est verrouillé
 
 V4 Sourcing Intelligence passe d'une logique d'ajouts fonctionnels à une logique de **gouvernance contractuelle** avant refactoring.
 
@@ -63,7 +63,7 @@ Le contrat définit la cible ; le dépôt fournit les faits.
 
 ## Méthode d'audit
 
-Deux réalités doivent rester séparées :
+Deux réalités restent séparées :
 
 ### TARGET
 Ce que V0.4 exige.
@@ -88,11 +88,9 @@ Une affirmation architecturale doit être soutenue par une preuve localisable pa
 
 Pour un comportement exécutable : préférence à `CODE + TEST`.
 
-Chaque constat important reçoit un Finding ID, par exemple :
+Chaque constat reçoit un Finding ID :
 
-`AUDIT-OPP-001`
-`AUDIT-RADAR-002`
-`AUDIT-DEC-003`
+`AUDIT-OPP-001`, `AUDIT-RADAR-001`, `AUDIT-SCORE-001`, `AUDIT-DEC-001`, etc.
 
 Chaîne de traçabilité :
 
@@ -100,18 +98,9 @@ Chaîne de traçabilité :
 
 ## Taxonomie GAP fermée
 
-| État | Signification |
-|---|---|
-| `CONFORME` | ACTUAL respecte TARGET |
-| `À_ADAPTER` | architecture correcte mais implémentation différente |
-| `CONTRADICTORY` | ACTUAL viole une règle du contrat |
-| `DUPLICATED` | responsabilité détenue par plusieurs composants |
-| `MISSING` | responsabilité absente |
-| `LEGACY` | ancien contrat encore présent |
-| `À_SUPPRIMER` | logique incompatible sans valeur à conserver |
-| `UNKNOWN` | preuves insuffisantes |
+`CONFORME · À_ADAPTER · CONTRADICTORY · DUPLICATED · MISSING · LEGACY · À_SUPPRIMER · UNKNOWN`
 
-`UNKNOWN` ne doit jamais être transformé en `CONFORME` par supposition.
+`UNKNOWN` signifie preuves insuffisantes et ne doit jamais être transformé en `CONFORME` par supposition.
 
 ## Périmètre V0.4
 
@@ -140,6 +129,31 @@ Le document contractuel couvre 22 sections :
 21. Validation & Testing
 22. Non-Goals
 
+## Initial repository audit — terminé sur le premier périmètre
+
+Audit détaillé : `docs/AUDIT-V0.4-TARGET-ACTUAL-INITIAL.md`
+
+| Finding | Composant | Gap initial |
+|---|---|---|
+| `AUDIT-OPP-001` | `modules/opportunity-model.js` | `À_ADAPTER` |
+| `AUDIT-RADAR-001` | `modules/radar-orchestrator.js` | `CONTRADICTORY` |
+| `AUDIT-SCORE-001` | `modules/radar-scoring-engine.js` | `CONTRADICTORY` |
+| `AUDIT-DEC-001` | `modules/decision-engine.js` | `CONTRADICTORY` |
+| `AUDIT-ECON-001` | `modules/profitability.js` | `À_ADAPTER` |
+| `AUDIT-SCHEMA-001` | `data/opportunity-schema.js` | `LEGACY` |
+| `AUDIT-HISTORY-001` | `modules/history.js` | `À_ADAPTER` |
+| `AUDIT-RISK-001` | Risk Engine | `UNKNOWN` — preuves encore insuffisantes |
+| `AUDIT-TRACE-001` | Decision Trace | `MISSING` |
+
+### Constats critiques déjà prouvés
+
+- Radar Scoring Engine pondère actuellement `confidence` à hauteur de 10%.
+- Radar Orchestrator construit et transmet actuellement les signaux de scoring et expose les anciens champs `score` / `scoreBreakdown` / `scoreStatus`.
+- Decision Engine recalcule actuellement un score global et peut recalculer une composante de profitability.
+- Opportunity Model mélange actuellement `potential`, `risk` et `dataConfidence` dans `dimensions`.
+- Legacy schema utilise encore `scoreV4`, `confidence`, `risks` et `decision` sous `analysis`.
+- History conserve actuellement `score`, `decision` et `confidence`, sans modèle Prediction/Result/Delta V0.4.
+
 ## Non-goals immédiats
 
 Pas de :
@@ -157,22 +171,18 @@ Pas de :
 
 ## Prochaine étape
 
-**Confronter le contrat au dépôt réel, fichier par fichier, sans modifier les moteurs de production.**
+**Compléter l'audit du dépôt réel**, notamment Risk, Evidence/Confidence, tests, configuration et historique complet, puis produire :
 
-Premiers composants à auditer :
+1. Gap Register complet ;
+2. Ownership Matrix validée ;
+3. Read/Write Matrix validée ;
+4. Migration Plan ;
+5. Test Plan.
 
-`modules/opportunity-model.js`  
-`modules/radar-orchestrator.js`  
-`modules/radar-scoring-engine.js`  
-`modules/profitability.js`  
-`modules/decision-engine.js`  
-`modules/history.js`  
-`data/opportunity-schema.js`
-
-Le résultat attendu est un registre `TARGET / ACTUAL / GAP / EVIDENCE / FINDING / ACTION / STATUS`.
+**Aucune modification de moteur de production avant ces étapes.**
 
 ## Point de référence
 
-État de départ de ce checkpoint : commit `30292cd01fdeb895bcf304d1b71445255e10f83e` sur `main`.
+État de départ : commit `30292cd01fdeb895bcf304d1b71445255e10f83e` sur `main`.
 
-**Aucune modification de production n'est incluse dans ce checkpoint.**
+Les modifications de cette branche sont **documentaires uniquement** : contrat, Master et checkpoint/audit. Aucun moteur de production n'a été modifié.
