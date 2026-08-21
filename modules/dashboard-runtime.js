@@ -70,7 +70,8 @@ export function calculateDashboardState(opportunity = DEMO_OPPORTUNITY) {
       demand: opportunity.demandScore,
       margin: economics.netContributionMargin,
       availability: opportunity.availability,
-      landedCost: opportunity.landedCostScore,
+      landedCost: opportunity.offer.landedCost,
+      landedCostScore: opportunity.landedCostScore,
       risk: opportunity.riskScore,
       easeOfTest: opportunity.easeOfTest,
       dataConfidence: opportunity.confidence,
@@ -198,7 +199,7 @@ function updateRadar(opportunity) {
 
   const d = opportunity.dimensions;
   const values = [
-    Number(d.landedCost) || 0,
+    Number(d.landedCostScore) || 0,
     Number(d.dataConfidence) || 0,
     Number(d.easeOfTest) || 0,
     Number(opportunity.scoreBreakdown?.sourcing ?? d.availability) || 0,
