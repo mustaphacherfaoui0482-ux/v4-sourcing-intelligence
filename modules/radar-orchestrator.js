@@ -44,6 +44,7 @@ export function buildRadarOpportunity(input = {}) {
     dataConfidence: dimensions.dataConfidence ?? productSignals.confidence ?? supplierFactors.dataConfidence,
     supplier: supplier.result ?? supplier,
     suppliers: input.suppliers,
+    costBreakdown: input.costBreakdown,
     economics,
     evidence: input.evidence,
     createdAt: input.createdAt,
