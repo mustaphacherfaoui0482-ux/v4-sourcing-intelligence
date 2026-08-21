@@ -21,6 +21,11 @@ const formatEuro = (value) => {
   return `${formatNumber(value, 2)} €`;
 };
 
+const formatSignal = (value) => {
+  if (value === null || value === undefined || value === '') return 'Donnée non disponible';
+  return String(value);
+};
+
 /**
  * Converts a canonical Opportunity into display-ready values.
  * It deliberately does not calculate or reinterpret business metrics.
@@ -28,6 +33,7 @@ const formatEuro = (value) => {
 export function toOpportunityViewModel(opportunity = {}) {
   const dimensions = opportunity.dimensions ?? {};
   const economics = opportunity.economics ?? {};
+  const marketSignals = opportunity.marketSignals ?? {};
 
   return {
     id: opportunity.id ?? null,
@@ -47,6 +53,13 @@ export function toOpportunityViewModel(opportunity = {}) {
       risk: formatNumber(dimensions.risk),
       easeOfTest: formatNumber(dimensions.easeOfTest),
       dataConfidence: formatPercent(dimensions.dataConfidence),
+    },
+    marketSignals: {
+      competition: formatSignal(marketSignals.competition),
+      saturation: formatSignal(marketSignals.saturation),
+      productionLeadTimeDays: marketSignals.productionLeadTimeDays == null
+        ? 'Donnée non disponible'
+        : `${formatNumber(marketSignals.productionLeadTimeDays)} jours`,
     },
     economics,
   };
