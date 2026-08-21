@@ -1,5 +1,5 @@
-// V4 UI Decision Bridge v5 — explicit evidence inputs + economic visualization
-// Deterministic UI: no invented external data. Evidence scores are user-entered.
+// V4 UI Decision Bridge v6 — Control Center Premium
+// Deterministic UI: no invented external data. Evidence scores remain user-entered.
 import { evaluateOpportunity } from './decision-engine.js';
 
 const n = (id) => Number(document.getElementById(id)?.value) || 0;
@@ -46,8 +46,41 @@ function renderEconomicChart(salePrice, landedCost, variableFees, cac, contribut
   }
 }
 
+function applyPremiumShell() {
+  if (document.getElementById('v4-premium-shell-style')) return;
+  const style = document.createElement('style');
+  style.id = 'v4-premium-shell-style';
+  style.textContent = `
+    :root{--v4-bg:#f4f6f8;--v4-surface:#fff;--v4-ink:#101828;--v4-muted:#667085;--v4-line:#e4e7ec;--v4-accent:#1d2939;--v4-focus:#475467;--v4-good:#067647;--v4-warn:#b54708;--v4-bad:#b42318}
+    html{background:var(--v4-bg);scroll-behavior:smooth}
+    body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--v4-bg);color:var(--v4-ink);letter-spacing:-.01em}
+    header{position:sticky;top:0;z-index:20;padding:18px 20px;background:rgba(16,24,40,.96);backdrop-filter:blur(14px);box-shadow:0 8px 30px rgba(16,24,40,.12)}
+    header h1{font-size:clamp(22px,3.2vw,32px);letter-spacing:-.035em} header p{font-size:12px;color:#d0d5dd}
+    main{max-width:1240px;margin:20px auto;padding:0 16px}
+    .card{background:rgba(255,255,255,.96);border:1px solid var(--v4-line);border-radius:16px;padding:20px;margin-bottom:14px;box-shadow:0 8px 26px rgba(16,24,40,.055)}
+    .card h2{font-size:16px;letter-spacing:-.02em;margin:0 0 14px}.muted,small{color:var(--v4-muted)}
+    .metrics{gap:10px}.metric{border:1px solid var(--v4-line);border-radius:13px;background:#fbfcfd;padding:14px}.metric span{font-size:11px}.metric b{font-size:22px;letter-spacing:-.03em}
+    #v4-engine-decision{border:1px solid #d0d5dd;border-left:4px solid var(--v4-good);background:#f7faf8;padding:18px;border-radius:14px;font-size:16px;line-height:1.5}
+    #v4-engine-decision b{font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+    section.card:has(#v4-engine-decision){border:1px solid #d0d5dd;background:linear-gradient(145deg,#fff 0%,#f7f9fb 100%);box-shadow:0 14px 34px rgba(16,24,40,.09);padding:22px}
+    section.card:has(#v4-engine-decision) h2{font-size:20px}
+    input,textarea,select{border-color:#d0d5dd;border-radius:9px;background:#fff;transition:border-color .15s,box-shadow .15s}input:focus,textarea:focus,select:focus{outline:0;border-color:#475467;box-shadow:0 0 0 3px rgba(71,84,103,.10)}
+    button{border-radius:9px;background:#101828;box-shadow:0 3px 8px rgba(16,24,40,.14);transition:transform .15s,opacity .15s}button:hover{opacity:.94;transform:translateY(-1px)}
+    .badge,.check{background:#f2f4f7;color:#344054;border:1px solid #e4e7ec;font-size:11px}
+    .source,.pipeline-step,.offer{border-radius:12px;background:#fff;border-color:#e4e7ec}
+    .source{min-height:150px}.source h3{font-size:14px}.pipeline-step{font-size:12px;font-weight:750;text-align:center;padding:12px}
+    .status{border-radius:11px;background:#f8fafc}.danger{border-left-color:var(--v4-bad)}.positive{border-left-color:var(--v4-good)}.warning{border-left-color:var(--v4-warn)}
+    .score{font-size:clamp(42px,7vw,64px);line-height:1;font-weight:900;letter-spacing:-.055em;color:#101828}
+    .chart{box-shadow:0 14px 34px rgba(16,24,40,.07)}
+    @media(max-width:700px){header{position:relative;padding:16px}main{margin:12px auto;padding:0 10px}.card{padding:15px;border-radius:14px}.metrics{grid-template-columns:repeat(2,1fr)!important}.metric b{font-size:20px}.source{min-height:auto}.pipeline{grid-template-columns:repeat(2,1fr)!important}section.card:has(#v4-engine-decision){padding:17px}#v4-engine-decision{font-size:15px}.v4-chart-head{gap:10px}.v4-chart-title{font-size:19px}.v4-score-badge{min-width:68px}}
+    @media(max-width:420px){.metrics,.grid,.radar,.checks,.pipeline{grid-template-columns:1fr!important}.v4-chart-footer{grid-template-columns:1fr!important}.v4-contribution-top{align-items:flex-start;flex-direction:column}.v4-contribution-meta{flex-direction:column;gap:3px}}
+  `;
+  document.head.appendChild(style);
+}
+
 function runV4DecisionBridge() {
   ensureEvidenceInputs();
+  applyPremiumShell();
   const salePrice = n('sale');
   const landedCost = ['p','c','pack','ship','customs','other'].reduce((sum,id) => sum + n(id), 0);
   const variableFees = n('fees'); const cac = n('cac'); const targetMargin = n('margin');
@@ -74,6 +107,7 @@ function runV4DecisionBridge() {
 
 window.addEventListener('DOMContentLoaded', () => {
   ensureEvidenceInputs();
+  applyPremiumShell();
   document.querySelectorAll('input, textarea, select').forEach((el) => { el.addEventListener('input', runV4DecisionBridge); el.addEventListener('change', runV4DecisionBridge); });
   runV4DecisionBridge();
 });
