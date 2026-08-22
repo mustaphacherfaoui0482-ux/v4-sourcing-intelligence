@@ -1,7 +1,7 @@
 /**
- * V4 Sourcing Intelligence — Radar Orchestrator v3
- * Coordinates existing deterministic engines without duplicating scoring or decision logic.
- * Compatibility layer: the existing Radar Scoring Engine remains the single scoring authority.
+ * V4 Sourcing Intelligence — Radar Orchestrator v4
+ * Compatibility layer around the canonical opportunity model.
+ * The Decision Engine is authoritative for the final decision score when available.
  */
 
 import { createOpportunity } from './opportunity-model.js';
@@ -47,13 +47,21 @@ export function buildRadarOpportunity(input = {}) {
     createdAt: input.createdAt,
   });
 
+  const hasDecisionScore = Number.isFinite(Number(decision?.opportunityIndex));
+
   return {
     ...opportunity,
-    score: radarScore.total,
-    scoreBreakdown: radarScore.breakdown,
-    scoreStatus: radarScore.status,
+    score: hasDecisionScore ? decision.opportunityIndex : radarScore.total,
+    scoreBreakdown: hasDecisionScore ? {
+      potential: decision.potential,
+      demand: decision.demand,
+      economics: decision.economics,
+      riskQuality: decision.riskQuality,
+    } : radarScore.breakdown,
+    scoreStatus: hasDecisionScore ? 'decision-index' : radarScore.status,
     decision: decision?.decision ?? null,
     decisionReason: decision?.reason ?? null,
+    decisionDetails: decision ?? null,
   };
 }
 

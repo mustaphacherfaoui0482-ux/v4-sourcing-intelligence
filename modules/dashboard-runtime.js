@@ -62,7 +62,7 @@ export function calculateDashboardState(opportunity = DEMO_OPPORTUNITY) {
       demand: opportunity.demandScore,
       margin: economics.netContributionMargin,
       availability: opportunity.availability,
-      landedCost: opportunity.landedCostScore,
+      landedCost: opportunity.offer.landedCost,
       risk: opportunity.riskScore,
       easeOfTest: opportunity.easeOfTest,
       dataConfidence: opportunity.confidence,
@@ -80,7 +80,6 @@ export function calculateDashboardState(opportunity = DEMO_OPPORTUNITY) {
 }
 
 const money = (value) => `${Number(value).toFixed(2).replace('.', ',')} €`;
-const percent = (value) => `${Number(value).toFixed(1).replace('.', ',')}%`;
 
 function setText(node, value) {
   if (node) node.textContent = value;
@@ -97,7 +96,11 @@ function setGauge(node, score) {
 function setDecisionStyle(node, decision) {
   if (!node) return;
   node.classList.remove('good');
-  node.style.color = decision === 'TESTER' ? 'var(--g)' : decision === 'EVITER' ? 'var(--r)' : 'var(--o)';
+  node.style.color = decision === 'ACHETER' || decision === 'TESTER'
+    ? 'var(--g)'
+    : decision === 'EVITER'
+      ? 'var(--r)'
+      : 'var(--o)';
 }
 
 function updateKpis(viewModel) {
@@ -105,7 +108,7 @@ function updateKpis(viewModel) {
   if (cards.length < 5) return;
 
   setGauge(cards[0].querySelector('.gauge'), Number(viewModel.score));
-  setText(cards[0].querySelector('.good'), Number(viewModel.score) >= 75 ? 'Excellent potentiel' : Number(viewModel.score) >= 50 ? 'Potentiel à approfondir' : 'Potentiel faible');
+  setText(cards[0].querySelector('.good'), Number(viewModel.score) >= 75 ? 'Indice décisionnel élevé' : Number(viewModel.score) >= 50 ? 'Opportunité à approfondir' : 'Opportunité faible');
   setText(cards[1].querySelector('.val'), viewModel.dimensions.landedCost);
   setText(cards[2].querySelector('.val'), viewModel.dimensions.margin);
   setText(cards[3].querySelector('.val'), money(viewModel.economics.maxCacAtTargetMargin));
@@ -167,6 +170,7 @@ function wireActions(state) {
       score: state.opportunity.score,
       decision: state.opportunity.decision,
       reason: state.opportunity.decisionReason,
+      decisionDetails: state.decision,
       economics: state.economics,
       generatedAt: new Date().toISOString(),
     };
