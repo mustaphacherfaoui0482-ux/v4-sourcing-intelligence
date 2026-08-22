@@ -38,9 +38,10 @@ export function evaluateRisk(opportunity = {}) {
 
   score = clamp(score);
 
+  const unknownData = risks.includes('UNKNOWN_DATA_CONFIDENCE');
   return {
     riskScore: score,
     risks,
-    status: score <= 30 ? 'low_risk' : score <= 60 ? 'review' : 'high_risk',
+    status: unknownData ? 'review' : score <= 30 ? 'low_risk' : score <= 60 ? 'review' : 'high_risk',
   };
 }
