@@ -31,14 +31,14 @@ const setText = (n, v) => { if (n) n.textContent = v; };
 function setGauge(node, score) {
   if (!node) return;
   const n = Math.max(0, Math.min(100, Number(score) || 0));
-  node.style.background = `conic-gradient(var(--g,#79df31) 0 ${n * 3.6}deg,#243546 ${n * 3.6}deg)`;
+  node.style.background = `conic-gradient(var(--green,#79df31) 0 ${n * 3.6}deg,#24302d ${n * 3.6}deg)`;
   setText(node.querySelector('b'), String(Math.round(n)));
 }
 
 function setDecisionStyle(node, decision) {
   if (!node) return;
   node.classList.remove('good');
-  node.style.color = decision === 'TESTER' ? 'var(--g,#79df31)' : decision === 'EVITER' ? 'var(--r,#ef5b52)' : 'var(--o,#f0a52b)';
+  node.style.color = decision === 'TESTER' ? 'var(--green,#79df31)' : decision === 'EVITER' ? 'var(--red,#ef5b52)' : 'var(--orange,#f0a52b)';
 }
 
 function render(state) {
@@ -46,7 +46,7 @@ function render(state) {
   const cards = [...document.querySelectorAll('.kpis .kpi')];
   if (cards.length >= 5) {
     setGauge(cards[0].querySelector('.gauge'), vm.score);
-    setText(cards[0].querySelector('.good'), Number(vm.score) >= 75 ? 'Excellent potentiel' : Number(vm.score) >= 50 ? 'Potentiel à approfondir' : 'Potentiel faible');
+    setText(cards[0].querySelector('.sub'), Number(vm.score) >= 75 ? 'Score opportunité élevé' : Number(vm.score) >= 50 ? 'Potentiel à approfondir' : 'Potentiel faible');
     setText(cards[1].querySelector('.val'), vm.dimensions.landedCost);
     setText(cards[2].querySelector('.val'), vm.dimensions.margin);
     setText(cards[3].querySelector('.val'), money(vm.economics.maxCacAtTargetMargin));
@@ -54,21 +54,23 @@ function render(state) {
     setText(cards[4].querySelector('.sub'), vm.decisionReason);
     setDecisionStyle(cards[4].querySelector('.decision'), vm.decision);
   }
-  const phone = document.querySelector('.phone');
-  if (phone) {
-    setGauge(phone.querySelector('.phoneg'), vm.score);
-    const pc = [...phone.querySelectorAll('.pc')];
-    if (pc.length >= 4) { setText(pc[0].querySelector('b'), vm.dimensions.landedCost); setText(pc[1].querySelector('b'), vm.dimensions.margin);
-      setText(pc[2].querySelector('b'), money(vm.economics.maxCacAtTargetMargin)); setText(pc[3].querySelector('b'), vm.decision); setDecisionStyle(pc[3].querySelector('b'), vm.decision); }
-  }
-  const advice = document.querySelector('.advice');
-  if (advice) { const s = state.economics.status === 'healthy' ? 'Économie saine.' : state.economics.status === 'thin_margin' ? 'Marge trop fine pour la cible.' : 'Économie déficitaire.';
-    advice.textContent = `💡 Diagnostic : ${s} Contribution après acquisition : ${money(state.economics.contributionAfterAds)} par commande.`; }
+  const evidence = document.querySelector('.evidence');
+  if (evidence) evidence.dataset.evidenceLevel = state.opportunity.evidenceLevel ?? 'P0';
   const signals = [...document.querySelectorAll('.signals .sig')];
-  if (signals.length >= 5) { setText(signals[0].querySelector('span'), `Score demande : ${state.opportunity.dimensions.demand}/100`);
-    setText(signals[1].querySelector('span'), 'À confirmer par analyse marché'); setText(signals[2].querySelector('span'), 'À confirmer par données');
-    setText(signals[3].querySelector('span'), `Risque calculé : ${state.opportunity.dimensions.risk}/100`);
-    setText(signals[4].querySelector('span'), `Niveau de preuve : ${state.opportunity.evidenceLevel}`); }
+  if (signals.length >= 5) {
+    setText(signals[0].querySelector('span'), `${state.opportunity.dimensions.potential ?? 0}/100`);
+    setText(signals[1].querySelector('span'), `${state.opportunity.dimensions.demand ?? 0}/100`);
+    setText(signals[2].querySelector('span'), `${state.opportunity.dimensions.margin ?? 0}%`);
+    setText(signals[3].querySelector('span'), `${state.opportunity.dimensions.risk ?? 0}/100`);
+    setText(signals[4].querySelector('span'), `Preuve : ${state.opportunity.evidenceLevel ?? 'P0'}`);
+  }
+  const proof = document.querySelector('.pbadge');
+  if (proof && state.opportunity.evidenceLevel) proof.textContent = `${state.opportunity.evidenceLevel} · niveau de preuve`;
+  const decisionNode = document.querySelector('.diagnostic');
+  if (decisionNode) {
+    const s = state.economics.status === 'healthy' ? 'Économie compatible avec un test.' : state.economics.status === 'thin_margin' ? 'Marge trop fine pour la cible.' : 'Économie déficitaire.';
+    decisionNode.textContent = `Diagnostic : ${s} Contribution après acquisition : ${money(state.economics.contributionAfterAds)} par commande. La preuve fournisseur et la validation qualité restent déterminantes avant achat.`;
+  }
 }
 
 function feedback(text) {
@@ -102,14 +104,14 @@ function startSourcing(product = DEMO_OPPORTUNITY.product) {
 function wireActions(state) {
   const root = document.documentElement; if (root.dataset.v4ActionsWired === 'true') return; root.dataset.v4ActionsWired = 'true';
   const buttons = [...document.querySelectorAll('button')];
-  const exportButton = buttons.find(b => b.textContent.includes('Exporter le rapport'));
-  if (exportButton) exportButton.addEventListener('click', () => { const current = window.V4SourcingRuntime ?? state; const report = { product:current.opportunity.product, score:current.opportunity.score, decision:current.opportunity.decision, reason:current.opportunity.decisionReason, economics:current.economics, generatedAt:new Date().toISOString() };
+  const exportButton = buttons.find(b => /Exporter/i.test(b.textContent));
+  if (exportButton) exportButton.addEventListener('click', () => { const current = window.V4SourcingRuntime ?? state; const report = { product:current.opportunity.product, score:current.opportunity.score, decision:current.opportunity.decision, reason:current.opportunity.decisionReason, evidenceLevel:current.opportunity.evidenceLevel, economics:current.economics, generatedAt:new Date().toISOString() };
     const url = URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'})); const a=document.createElement('a'); a.href=url; a.download='v4-sourcing-intelligence-report.json'; document.body.appendChild(a); a.click(); a.remove(); window.setTimeout(()=>URL.revokeObjectURL(url),250); });
-  const newSourcing = buttons.find(b => b.textContent.includes('Nouveau sourcing'));
-  if (newSourcing) newSourcing.addEventListener('click', () => { const product = window.prompt('Produit à analyser'); if (product?.trim()) startSourcing(product); });
+  const newSourcingButtons = buttons.filter(b => b.dataset.action === 'new' || /Nouveau sourcing|Lancer une vérification/i.test(b.textContent));
+  newSourcingButtons.forEach(button => button.addEventListener('click', () => { const product = window.prompt('Produit à analyser'); if (product?.trim()) startSourcing(product); }));
   const selects = [...document.querySelectorAll('.bar select')]; selects.forEach(select => select.addEventListener('change', () => { const productSelect=selects[1]; if(productSelect && select===productSelect && productSelect.value){ initDashboardRuntime({...DEMO_OPPORTUNITY,product:productSelect.value}); feedback(`Produit sélectionné : ${productSelect.value}`); } }));
-  const targets = {'Dashboard':'.hero','Radar Sourcing':'.radar','Opportunités':'.twocol','Fournisseurs':'.twocol','Coût rendu':'.grid2 .panel:nth-child(2)','Échantillon & QC':'.qcs','Décisions':'.kpis .kpi:nth-child(5)','Rentabilité':'.grid2','Veille & Alertes':'.phoneAlert'};
-  [...document.querySelectorAll('.nav a')].forEach(link => link.addEventListener('click', event => { event.preventDefault(); const links=[...document.querySelectorAll('.nav a')]; links.forEach(x=>x.classList.remove('on')); link.classList.add('on'); const label=link.querySelector('span')?.textContent?.trim() || 'Vue';
+  const targets = {'Dashboard':'.hero','Radar Sourcing':'.radar','Opportunités':'.table','Fournisseurs':'.table','Coût rendu':'.grid','Échantillon & QC':'.section:last-of-type','Décisions':'.kpis .kpi:nth-child(5)','Rentabilité':'.grid','Veille & Alertes':'.diagnostic'};
+  [...document.querySelectorAll('.nav a')].forEach(link => link.addEventListener('click', event => { event.preventDefault(); const links=[...document.querySelectorAll('.nav a')]; links.forEach(x=>x.classList.remove('on')); link.classList.add('on'); const label=(link.querySelector('span:last-child')?.textContent || link.textContent || 'Vue').trim();
     if(label==='Radar Sourcing') startSourcing(window.V4SourcingRuntime?.opportunity?.product || DEMO_OPPORTUNITY.product);
     const target=targets[label] ? document.querySelector(targets[label]) : null; if(target) target.scrollIntoView({behavior:'smooth',block:'center'}); feedback(label); }));
 }
