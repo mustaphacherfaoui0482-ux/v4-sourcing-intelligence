@@ -8,15 +8,7 @@ export const DEMO_OPPORTUNITY = Object.freeze({
   product: 'HOODIE DZ - PREMIUM 450GSM',
   source: '1688',
   country: 'CN',
-  offer: {
-    salePrice: 29.9,
-    landedCost: 7,
-    variableFees: 1.22,
-    cac: 6.1,
-    targetMargin: 30,
-    visitors: 1000,
-    conversionRate: 2.5,
-  },
+  offer: { salePrice: 29.9, landedCost: 7, variableFees: 1.22, cac: 6.1, targetMargin: 30, visitors: 1000, conversionRate: 2.5 },
   demandScore: 90,
   sourcingScore: 92,
   profitabilityScore: 90,
@@ -43,11 +35,7 @@ function toEngineInput(opportunity) {
 
 export function calculateDashboardState(opportunity = DEMO_OPPORTUNITY) {
   const economics = calculateOfferEconomics(opportunity.offer);
-  const decisionInput = {
-    ...opportunity,
-    landedCost: opportunity.offer.landedCost,
-    margin: economics.netContributionMargin,
-  };
+  const decisionInput = { ...opportunity, landedCost: opportunity.offer.landedCost, margin: economics.netContributionMargin };
   const decision = evaluateOpportunity(decisionInput);
   const canonical = buildRadarOpportunity({
     id: opportunity.id,
@@ -72,21 +60,20 @@ export function calculateDashboardState(opportunity = DEMO_OPPORTUNITY) {
 }
 
 const money = (value) => `${Number(value).toFixed(2).replace('.', ',')} €`;
-
 function setText(node, value) { if (node) node.textContent = value; }
 
 function setGauge(node, score) {
   if (!node) return;
   const clamped = Math.max(0, Math.min(100, Number(score) || 0));
   const degrees = clamped * 3.6;
-  node.style.background = `conic-gradient(var(--g) 0 ${degrees}deg, #243546 ${degrees}deg)`;
+  node.style.background = `conic-gradient(var(--g, #79df31) 0 ${degrees}deg, #243546 ${degrees}deg)`;
   setText(node.querySelector('b'), String(Math.round(clamped)));
 }
 
 function setDecisionStyle(node, decision) {
   if (!node) return;
   node.classList.remove('good');
-  node.style.color = decision === 'TESTER' ? 'var(--g)' : decision === 'EVITER' ? 'var(--r)' : 'var(--o)';
+  node.style.color = decision === 'TESTER' ? 'var(--g, #79df31)' : decision === 'EVITER' ? 'var(--r, #ef5b52)' : 'var(--o, #f0a52b)';
 }
 
 function updateKpis(viewModel) {
@@ -137,30 +124,71 @@ function updateSignals(opportunity) {
   setText(signals[4].querySelector('span'), 'Hypothèse fournisseur');
 }
 
+function findPanelByText(text) {
+  const needle = text.toLocaleLowerCase('fr-FR');
+  return [...document.querySelectorAll('.panel,.kpi,.hero')].find((node) => node.textContent.toLocaleLowerCase('fr-FR').includes(needle));
+}
+
+function showNavigationFeedback(label) {
+  const existing = document.querySelector('[data-v4-nav-feedback]');
+  existing?.remove();
+  const feedback = document.createElement('div');
+  feedback.dataset.v4NavFeedback = 'true';
+  feedback.textContent = `${label} · vue intégrée au Control Center`;
+  Object.assign(feedback.style, {
+    position: 'fixed', right: '18px', bottom: '18px', zIndex: '9999', padding: '10px 13px',
+    border: '1px solid #5b4a27', borderRadius: '8px', background: '#11100d', color: '#d7b45a',
+    font: '600 11px Inter,system-ui,sans-serif', boxShadow: '0 10px 30px #0008'
+  });
+  document.body.appendChild(feedback);
+  window.setTimeout(() => feedback.remove(), 1800);
+}
+
 function wireActions(state) {
-  const exportButton = [...document.querySelectorAll('button')].find((button) => button.textContent.includes('Exporter le rapport'));
+  const buttons = [...document.querySelectorAll('button')];
+  const exportButton = buttons.find((button) => button.textContent.includes('Exporter le rapport'));
   if (exportButton) exportButton.addEventListener('click', () => {
     const report = { product: state.opportunity.product, score: state.opportunity.score, decision: state.opportunity.decision, reason: state.opportunity.decisionReason, economics: state.economics, generatedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'v4-sourcing-intelligence-report.json'; anchor.click(); URL.revokeObjectURL(url);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'v4-sourcing-intelligence-report.json';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 250);
   }, { once: true });
 
-  const newSourcing = [...document.querySelectorAll('button')].find((button) => button.textContent.includes('Nouveau sourcing'));
+  const newSourcing = buttons.find((button) => button.textContent.includes('Nouveau sourcing'));
   if (newSourcing) newSourcing.addEventListener('click', () => {
     const product = window.prompt('Produit à analyser');
     if (!product || !product.trim()) return;
     const next = { ...DEMO_OPPORTUNITY, id: `manual-${Date.now()}`, product: product.trim() };
     initDashboardRuntime(next);
+    showNavigationFeedback(`Nouveau sourcing : ${product.trim()}`);
   }, { once: true });
 
   const selects = [...document.querySelectorAll('.bar select')];
   selects.forEach((select) => select.addEventListener('change', () => {
     const productSelect = selects[1];
     if (productSelect && select === productSelect && productSelect.value) {
-      const next = { ...DEMO_OPPORTUNITY, product: productSelect.value };
-      initDashboardRuntime(next);
+      initDashboardRuntime({ ...DEMO_OPPORTUNITY, product: productSelect.value });
+      showNavigationFeedback(`Produit sélectionné : ${productSelect.value}`);
     }
   }));
+
+  const targets = {
+    'Dashboard': '.hero',
+    'Radar Sourcing': '.radar',
+    'Opportunités': '.twocol',
+    'Fournisseurs': '.twocol',
+    'Coût rendu': '.grid2 .panel:nth-child(2)',
+    'Échantillon & QC': '.qcs',
+    'Décisions': '.kpis .kpi:nth-child(5)',
+    'Rentabilité': '.grid2',
+    'Veille & Alertes': '.phoneAlert',
+  };
 
   const navLinks = [...document.querySelectorAll('.nav a')];
   navLinks.forEach((link) => link.addEventListener('click', (event) => {
@@ -168,8 +196,12 @@ function wireActions(state) {
     navLinks.forEach((item) => item.classList.remove('on'));
     link.classList.add('on');
     const label = link.querySelector('span')?.textContent?.trim() || 'Vue';
-    const target = [...document.querySelectorAll('.panel,.kpi,.hero')].find((node) => node.textContent.includes(label));
-    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const selector = targets[label];
+    const target = selector ? document.querySelector(selector) : findPanelByText(label);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      showNavigationFeedback(label);
+    }
   }));
 }
 
