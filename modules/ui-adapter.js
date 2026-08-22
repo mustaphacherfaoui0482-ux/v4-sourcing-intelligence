@@ -1,5 +1,5 @@
 /**
- * V4 Sourcing Intelligence — UI Adapter v1
+ * V4 Sourcing Intelligence — UI Adapter v2
  * Presentation contract only. No scoring, decision, or business-rule calculations.
  */
 
@@ -21,13 +21,11 @@ const formatEuro = (value) => {
   return `${formatNumber(value, 2)} €`;
 };
 
-/**
- * Converts a canonical Opportunity into display-ready values.
- * It deliberately does not calculate or reinterpret business metrics.
- */
 export function toOpportunityViewModel(opportunity = {}) {
   const dimensions = opportunity.dimensions ?? {};
   const economics = opportunity.economics ?? {};
+  const decision = opportunity.decisionDetails ?? {};
+  const gates = decision.gates ?? {};
 
   return {
     id: opportunity.id ?? null,
@@ -38,6 +36,16 @@ export function toOpportunityViewModel(opportunity = {}) {
     scoreStatus: opportunity.scoreStatus ?? '—',
     decision: opportunity.decision ?? '—',
     decisionReason: opportunity.decisionReason ?? '—',
+    confidence: formatPercent(decision.confidence),
+    priority: decision.priority ?? '—',
+    nextAction: decision.nextAction ?? '—',
+    gates: {
+      blocking: gates.counts?.blocking ?? 0,
+      confirmedBlocking: gates.counts?.confirmedBlocking ?? 0,
+      unresolvedBlocking: gates.counts?.unresolvedBlocking ?? 0,
+      major: gates.counts?.major ?? 0,
+    },
+    contradictions: decision.contradictions?.contradictions?.length ?? 0,
     dimensions: {
       potential: formatNumber(dimensions.potential),
       demand: formatNumber(dimensions.demand),
