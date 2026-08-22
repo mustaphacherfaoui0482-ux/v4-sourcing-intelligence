@@ -22,5 +22,6 @@ jobs:
         with:
           node-version: 22
 
+      # Keep CI independently triggerable from Vercel deployment limits.
       - name: Run tests
         run: npm test
