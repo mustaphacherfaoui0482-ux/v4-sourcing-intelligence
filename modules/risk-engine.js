@@ -1,38 +1,46 @@
-// V4 Sourcing Intelligence - Risk Engine V1
+// V4 Sourcing Intelligence — Risk Engine V2
+// Contract semantics: riskScore is a risk score (0 = low risk, 100 = high risk).
 // Explicit rules only. No AI decision layer.
+
+const clamp = (value) => Math.max(0, Math.min(100, Number(value)));
 
 export function evaluateRisk(opportunity = {}) {
   const risks = [];
-  let score = 100;
+  let score = 0;
 
-  if (!opportunity.dataConfidence || opportunity.dataConfidence < 50) {
+  if (!Number.isFinite(Number(opportunity.dataConfidence))) {
+    risks.push('UNKNOWN_DATA_CONFIDENCE');
+    score += 25;
+  } else if (Number(opportunity.dataConfidence) < 50) {
     risks.push('LOW_DATA_CONFIDENCE');
-    score -= 20;
+    score += 20;
   }
 
   if (opportunity.competition === 'high') {
     risks.push('HIGH_COMPETITION');
-    score -= 15;
+    score += 15;
   }
 
-  if (opportunity.moq && opportunity.moq > 500) {
+  if (Number(opportunity.moq) > 500) {
     risks.push('HIGH_MOQ');
-    score -= 15;
+    score += 15;
   }
 
-  if (opportunity.margin && opportunity.margin < 30) {
+  if (Number.isFinite(Number(opportunity.margin)) && Number(opportunity.margin) < 30) {
     risks.push('LOW_MARGIN');
-    score -= 20;
+    score += 20;
   }
 
-  if (opportunity.supplierVerified === false) {
+  if (opportunity.supplierVerified !== true) {
     risks.push('UNVERIFIED_SUPPLIER');
-    score -= 20;
+    score += 20;
   }
+
+  score = clamp(score);
 
   return {
-    riskScore: Math.max(score, 0),
+    riskScore: score,
     risks,
-    status: score >= 70 ? 'acceptable' : score >= 40 ? 'review' : 'high_risk'
+    status: score <= 30 ? 'low_risk' : score <= 60 ? 'review' : 'high_risk',
   };
 }
