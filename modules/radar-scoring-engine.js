@@ -1,32 +1,38 @@
-// V4 Sourcing Intelligence - Radar Scoring Engine v1
-// Rule-based scoring only. No AI decision layer.
+// V4 Sourcing Intelligence - Radar Scoring Engine v2
+// Rule-based scoring only. Confidence is kept separate from potential scoring.
+
+const POTENTIAL_WEIGHTS = Object.freeze({
+  demand: 25,
+  marketing: 20,
+  sourcing: 20,
+  profitability: 25,
+});
+
+const POTENTIAL_WEIGHT_TOTAL = Object.values(POTENTIAL_WEIGHTS).reduce(
+  (total, weight) => total + weight,
+  0,
+);
 
 export function calculateRadarScore(signals = {}) {
-  const weights = {
-    demand: 25,
-    marketing: 20,
-    sourcing: 20,
-    profitability: 25,
-    confidence: 10,
-  };
+  const potentialRaw =
+    normalize(signals.demand) * POTENTIAL_WEIGHTS.demand / 100 +
+    normalize(signals.marketing) * POTENTIAL_WEIGHTS.marketing / 100 +
+    normalize(signals.sourcing) * POTENTIAL_WEIGHTS.sourcing / 100 +
+    normalize(signals.profitability) * POTENTIAL_WEIGHTS.profitability / 100;
 
-  const score =
-    normalize(signals.demand) * weights.demand / 100 +
-    normalize(signals.marketing) * weights.marketing / 100 +
-    normalize(signals.sourcing) * weights.sourcing / 100 +
-    normalize(signals.profitability) * weights.profitability / 100 +
-    normalize(signals.confidence) * weights.confidence / 100;
+  const potential = Math.round((potentialRaw * 100) / POTENTIAL_WEIGHT_TOTAL);
+  const confidence = normalize(signals.confidence);
 
   return {
-    total: Math.round(score),
+    total: potential,
     breakdown: {
       demand: normalize(signals.demand),
       marketing: normalize(signals.marketing),
       sourcing: normalize(signals.sourcing),
       profitability: normalize(signals.profitability),
-      confidence: normalize(signals.confidence),
+      confidence,
     },
-    status: scoreStatus(score),
+    status: scoreStatus(potential),
   };
 }
 
