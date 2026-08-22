@@ -11,10 +11,6 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: github-pages
-  cancel-in-progress: true
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -22,8 +18,23 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Verify release payload
+        shell: bash
+        run: |
+          test -f index.html
+          test -f v4-fennec-mark.png
+          test -f modules/dashboard-runtime.js
+          grep -q "V4 SOURCING INTELLIGENCE" index.html
+          grep -q "CONTROL CENTER" index.html
+          grep -q "dashboard-runtime.js" index.html
+          echo "Pages payload verified from main"
+          git rev-parse HEAD
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
