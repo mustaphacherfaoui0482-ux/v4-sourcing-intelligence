@@ -36,6 +36,6 @@ test('risk score increases with explicit risk factors', () => {
 test('unknown data confidence is not treated as safe', () => {
   const result = evaluateRisk({ supplierVerified: true });
   assert.equal(result.riskScore, 25);
-  assert.equal(result.status, 'low_risk');
+  assert.equal(result.status, 'review');
   assert.ok(result.risks.includes('UNKNOWN_DATA_CONFIDENCE'));
 });
