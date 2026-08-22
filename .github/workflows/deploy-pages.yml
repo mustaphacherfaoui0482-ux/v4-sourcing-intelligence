@@ -1,8 +1,6 @@
 name: Deploy V4 Sourcing Intelligence to GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -22,7 +20,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout main
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 1
@@ -38,7 +36,6 @@ jobs:
           grep -q "CONTROL CENTER" index.html
           grep -q "dashboard-runtime.js" index.html
           echo "Pages payload verified from main"
-          echo "RELEASE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
           git rev-parse HEAD
 
       - name: Configure GitHub Pages
