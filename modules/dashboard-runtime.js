@@ -31,7 +31,6 @@ export const DEMO_OPPORTUNITY = Object.freeze({
 
 function toEngineInput(opportunity) {
   const economics = calculateOfferEconomics(opportunity.offer);
-
   return {
     demand: opportunity.demandScore,
     marketing: opportunity.marketingScore ?? opportunity.demandScore,
@@ -50,7 +49,6 @@ export function calculateDashboardState(opportunity = DEMO_OPPORTUNITY) {
     margin: economics.netContributionMargin,
   };
   const decision = evaluateOpportunity(decisionInput);
-
   const canonical = buildRadarOpportunity({
     id: opportunity.id,
     product: opportunity.product,
@@ -70,21 +68,12 @@ export function calculateDashboardState(opportunity = DEMO_OPPORTUNITY) {
     economics,
     decision,
   });
-
-  return Object.freeze({
-    economics,
-    decision,
-    opportunity: canonical,
-    viewModel: toOpportunityViewModel(canonical),
-  });
+  return Object.freeze({ economics, decision, opportunity: canonical, viewModel: toOpportunityViewModel(canonical) });
 }
 
 const money = (value) => `${Number(value).toFixed(2).replace('.', ',')} €`;
-const percent = (value) => `${Number(value).toFixed(1).replace('.', ',')}%`;
 
-function setText(node, value) {
-  if (node) node.textContent = value;
-}
+function setText(node, value) { if (node) node.textContent = value; }
 
 function setGauge(node, score) {
   if (!node) return;
@@ -103,7 +92,6 @@ function setDecisionStyle(node, decision) {
 function updateKpis(viewModel) {
   const cards = [...document.querySelectorAll('.kpis .kpi')];
   if (cards.length < 5) return;
-
   setGauge(cards[0].querySelector('.gauge'), Number(viewModel.score));
   setText(cards[0].querySelector('.good'), Number(viewModel.score) >= 75 ? 'Excellent potentiel' : Number(viewModel.score) >= 50 ? 'Potentiel à approfondir' : 'Potentiel faible');
   setText(cards[1].querySelector('.val'), viewModel.dimensions.landedCost);
@@ -117,11 +105,9 @@ function updateKpis(viewModel) {
 function updatePhone(viewModel) {
   const phone = document.querySelector('.phone');
   if (!phone) return;
-
   setGauge(phone.querySelector('.phoneg'), Number(viewModel.score));
   const cards = [...phone.querySelectorAll('.pc')];
   if (cards.length < 4) return;
-
   setText(cards[0].querySelector('b'), viewModel.dimensions.landedCost);
   setText(cards[1].querySelector('b'), viewModel.dimensions.margin);
   setText(cards[2].querySelector('b'), money(viewModel.economics.maxCacAtTargetMargin));
@@ -132,13 +118,7 @@ function updatePhone(viewModel) {
 function updateCostAdvice(economics) {
   const advice = document.querySelector('.advice');
   if (!advice) return;
-
-  const status = economics.status === 'healthy'
-    ? 'Économie saine.'
-    : economics.status === 'thin_margin'
-      ? 'Marge trop fine pour la cible.'
-      : 'Économie déficitaire.';
-
+  const status = economics.status === 'healthy' ? 'Économie saine.' : economics.status === 'thin_margin' ? 'Marge trop fine pour la cible.' : 'Économie déficitaire.';
   advice.textContent = '';
   const prefix = document.createTextNode('💡 Diagnostic : ');
   const statusNode = document.createElement('b');
@@ -159,46 +139,54 @@ function updateSignals(opportunity) {
 
 function wireActions(state) {
   const exportButton = [...document.querySelectorAll('button')].find((button) => button.textContent.includes('Exporter le rapport'));
-  if (!exportButton) return;
-
-  exportButton.addEventListener('click', () => {
-    const report = {
-      product: state.opportunity.product,
-      score: state.opportunity.score,
-      decision: state.opportunity.decision,
-      reason: state.opportunity.decisionReason,
-      economics: state.economics,
-      generatedAt: new Date().toISOString(),
-    };
+  if (exportButton) exportButton.addEventListener('click', () => {
+    const report = { product: state.opportunity.product, score: state.opportunity.score, decision: state.opportunity.decision, reason: state.opportunity.decisionReason, economics: state.economics, generatedAt: new Date().toISOString() };
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'v4-sourcing-intelligence-report.json';
-    anchor.click();
-    URL.revokeObjectURL(url);
+    const url = URL.createObjectURL(blob); const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'v4-sourcing-intelligence-report.json'; anchor.click(); URL.revokeObjectURL(url);
   }, { once: true });
+
+  const newSourcing = [...document.querySelectorAll('button')].find((button) => button.textContent.includes('Nouveau sourcing'));
+  if (newSourcing) newSourcing.addEventListener('click', () => {
+    const product = window.prompt('Produit à analyser');
+    if (!product || !product.trim()) return;
+    const next = { ...DEMO_OPPORTUNITY, id: `manual-${Date.now()}`, product: product.trim() };
+    initDashboardRuntime(next);
+  }, { once: true });
+
+  const selects = [...document.querySelectorAll('.bar select')];
+  selects.forEach((select) => select.addEventListener('change', () => {
+    const productSelect = selects[1];
+    if (productSelect && select === productSelect && productSelect.value) {
+      const next = { ...DEMO_OPPORTUNITY, product: productSelect.value };
+      initDashboardRuntime(next);
+    }
+  }));
+
+  const navLinks = [...document.querySelectorAll('.nav a')];
+  navLinks.forEach((link) => link.addEventListener('click', (event) => {
+    event.preventDefault();
+    navLinks.forEach((item) => item.classList.remove('on'));
+    link.classList.add('on');
+    const label = link.querySelector('span')?.textContent?.trim() || 'Vue';
+    const target = [...document.querySelectorAll('.panel,.kpi,.hero')].find((node) => node.textContent.includes(label));
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }));
 }
 
 export function initDashboardRuntime(opportunity = DEMO_OPPORTUNITY) {
   const state = calculateDashboardState(opportunity);
   const { viewModel } = state;
-
   updateKpis(viewModel);
   updatePhone(viewModel);
   updateCostAdvice(state.economics);
   updateSignals(state.opportunity);
   wireActions(state);
-
   document.documentElement.dataset.v4Runtime = 'ready';
   window.V4SourcingRuntime = Object.freeze(state);
   return state;
 }
 
 if (typeof document !== 'undefined') {
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => initDashboardRuntime(), { once: true });
-  } else {
-    initDashboardRuntime();
-  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => initDashboardRuntime(), { once: true });
+  else initDashboardRuntime();
 }
