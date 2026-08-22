@@ -5,6 +5,15 @@
 
 const clamp = (value) => Math.max(0, Math.min(100, Number(value) || 0));
 
+const normalizeLandedCost = (value) => {
+  if (value === null || value === undefined || value === 'UNKNOWN') return null;
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+
+  return Math.max(0, Math.min(100, numeric));
+};
+
 export function createOpportunity(input = {}) {
   return {
     id: input.id ?? null,
@@ -16,7 +25,7 @@ export function createOpportunity(input = {}) {
       demand: clamp(input.demand),
       margin: clamp(input.margin),
       availability: clamp(input.availability),
-      landedCost: clamp(input.landedCost),
+      landedCost: normalizeLandedCost(input.landedCost),
       risk: clamp(input.risk),
       easeOfTest: clamp(input.easeOfTest),
       dataConfidence: clamp(input.dataConfidence),
