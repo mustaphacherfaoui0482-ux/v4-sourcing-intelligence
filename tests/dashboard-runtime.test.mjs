@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateDashboardState, DEMO_OPPORTUNITY } from '../modules/dashboard-runtime.js';
+import { calculateDashboardState, DEMO_OPPORTUNITY, EMPTY_OPPORTUNITY } from '../modules/dashboard-runtime.js';
 
-// Explicit test fixture: production startup remains data-free (P0),
-// while engine integration is verified with a fully specified opportunity.
+// Demo preview is explicit presentation data; an explicitly empty opportunity must remain P0.
 const ENGINE_FIXTURE = Object.freeze({
   id: 'test-opportunity', product: 'Test opportunity', source: '1688', country: 'CN',
   offer: { salePrice: 29.9, landedCost: 7, variableFees: 1.22, cac: 6.1, targetMargin: 30, visitors: 1000, conversionRate: 2.5 },
@@ -20,11 +19,19 @@ test('dashboard runtime derives KPI state from canonical V4 engines', () => {
   assert.equal(state.decision.score, 92);
 });
 
-test('dashboard startup remains empty and does not invent an opportunity', () => {
-  const state = calculateDashboardState(DEMO_OPPORTUNITY);
+test('empty opportunity remains empty and does not invent an opportunity', () => {
+  const state = calculateDashboardState(EMPTY_OPPORTUNITY);
   assert.equal(state.opportunity.product, 'Aucune opportunité active');
   assert.equal(state.economics.inputs.landedCost, 0);
   assert.equal(state.opportunity.evidenceLevel, 'P0');
+  assert.equal(state.isDemo, false);
+});
+
+test('dashboard demo fixture remains explicit preview data', () => {
+  const state = calculateDashboardState(DEMO_OPPORTUNITY);
+  assert.equal(state.opportunity.product, 'HOODIE DZ - PREMIUM 450GSM');
+  assert.equal(state.economics.inputs.landedCost, 7);
+  assert.equal(state.isDemo, true);
 });
 
 test('dashboard runtime changes decision when confidence is insufficient', () => {
