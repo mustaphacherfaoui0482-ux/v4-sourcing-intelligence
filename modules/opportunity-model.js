@@ -1,7 +1,9 @@
 /**
- * V4 Sourcing Intelligence — Canonical Opportunity Model v1
+ * V4 Sourcing Intelligence — Canonical Opportunity Model v2
  * Pure normalization layer. No scoring and no external data generation.
  */
+
+import { normalizeEvidenceLevel } from './evidence-level.js';
 
 const clamp = (value) => Math.max(0, Math.min(100, Number(value) || 0));
 
@@ -24,6 +26,7 @@ export function createOpportunity(input = {}) {
     supplier: input.supplier ?? null,
     economics: input.economics ?? null,
     evidence: Array.isArray(input.evidence) ? input.evidence : [],
+    evidenceLevel: normalizeEvidenceLevel(input.evidenceLevel),
     createdAt: input.createdAt ?? null,
   };
 }
