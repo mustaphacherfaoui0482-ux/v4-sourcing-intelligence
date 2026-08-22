@@ -1,0 +1,7 @@
+node_modules/
+.git/
+.wrangler/
+.github/
+.gitignore
+.assetsignore
+*.log
