@@ -1,4 +1,4 @@
-name: V4 Sourcing Intelligence Tests
+name: V4 Sourcing Intelligence Tests + GitHub Pages
 
 on:
   push:
@@ -9,6 +9,12 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: v4-pages
+  cancel-in-progress: false
 
 jobs:
   test:
@@ -22,6 +28,44 @@ jobs:
         with:
           node-version: 22
 
-      # Keep CI independently triggerable from Vercel deployment limits.
       - name: Run tests
         run: npm test
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Verify exact release payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f index.html
+          test -f v4-fennec-mark.png
+          test -f modules/dashboard-runtime.js
+          grep -q "V4 SOURCING INTELLIGENCE" index.html
+          grep -q "CONTROL CENTER" index.html
+          grep -q "dashboard-runtime.js" index.html
+          echo "RELEASE_SHA=$(git rev-parse HEAD)"
+          echo "GitHub Pages payload verified"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload exact repository payload
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+
+      - name: Deploy exact payload to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
