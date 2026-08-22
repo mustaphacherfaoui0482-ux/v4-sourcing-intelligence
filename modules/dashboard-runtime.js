@@ -121,7 +121,7 @@ function updateSignals(opportunity) {
   setText(signals[1].querySelector('span'), 'À confirmer par analyse marché');
   setText(signals[2].querySelector('span'), 'À confirmer par données');
   setText(signals[3].querySelector('span'), `Risque calculé : ${opportunity.dimensions.risk}/100`);
-  setText(signals[4].querySelector('span'), 'Hypothèse fournisseur');
+  setText(signals[4].querySelector('span'), `Niveau de preuve : ${opportunity.evidenceLevel}`);
 }
 
 function findPanelByText(text) {
@@ -145,6 +145,10 @@ function showNavigationFeedback(label) {
 }
 
 function wireActions(state) {
+  const root = document.documentElement;
+  if (root.dataset.v4ActionsWired === 'true') return;
+  root.dataset.v4ActionsWired = 'true';
+
   const buttons = [...document.querySelectorAll('button')];
   const exportButton = buttons.find((button) => button.textContent.includes('Exporter le rapport'));
   if (exportButton) exportButton.addEventListener('click', () => {
@@ -158,7 +162,7 @@ function wireActions(state) {
     anchor.click();
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 250);
-  }, { once: true });
+  });
 
   const newSourcing = buttons.find((button) => button.textContent.includes('Nouveau sourcing'));
   if (newSourcing) newSourcing.addEventListener('click', () => {
@@ -167,7 +171,7 @@ function wireActions(state) {
     const next = { ...DEMO_OPPORTUNITY, id: `manual-${Date.now()}`, product: product.trim() };
     initDashboardRuntime(next);
     showNavigationFeedback(`Nouveau sourcing : ${product.trim()}`);
-  }, { once: true });
+  });
 
   const selects = [...document.querySelectorAll('.bar select')];
   selects.forEach((select) => select.addEventListener('change', () => {
