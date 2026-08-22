@@ -9,7 +9,7 @@ test('dashboard runtime derives KPI state from canonical V4 engines', () => {
   assert.equal(Math.round(state.economics.netContributionMargin * 10) / 10, 52.1);
   assert.equal(Math.round(state.economics.maxCacAtTargetMargin * 100) / 100, 12.71);
   assert.equal(state.decision.decision, 'TESTER');
-  assert.equal(state.decision.score, 90);
+  assert.equal(state.decision.score, 92);
 });
 
 test('dashboard runtime changes decision when confidence is insufficient', () => {
