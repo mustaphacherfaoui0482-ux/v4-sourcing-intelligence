@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateDashboardState, DEMO_OPPORTUNITY, EMPTY_OPPORTUNITY } from '../modules/dashboard-runtime.js';
+import { calculateDashboardState, DEMO_OPPORTUNITY, EMPTY_OPPORTUNITY, buildManualOpportunity } from '../modules/dashboard-runtime.js';
 
-// Demo preview is explicit presentation data; an explicitly empty opportunity must remain P0.
 const ENGINE_FIXTURE = Object.freeze({
   id: 'test-opportunity', product: 'Test opportunity', source: '1688', country: 'CN',
   offer: { salePrice: 29.9, landedCost: 7, variableFees: 1.22, cac: 6.1, targetMargin: 30, visitors: 1000, conversionRate: 2.5 },
@@ -32,6 +31,22 @@ test('dashboard demo fixture remains explicit preview data', () => {
   assert.equal(state.opportunity.product, 'HOODIE DZ - PREMIUM 450GSM');
   assert.equal(state.economics.inputs.landedCost, 7);
   assert.equal(state.isDemo, true);
+});
+
+test('manual sourcing creates a P0 record without inventing scores or evidence', () => {
+  const opportunity = buildManualOpportunity('Lampe rechargeable');
+  assert.equal(opportunity.product, 'Lampe rechargeable');
+  assert.equal(opportunity.source, 'À renseigner');
+  assert.equal(opportunity.isDemo, false);
+  const state = calculateDashboardState(opportunity);
+  assert.equal(state.opportunity.product, 'Lampe rechargeable');
+  assert.equal(state.opportunity.evidenceLevel, 'P0');
+  assert.equal(state.opportunity.score, 0);
+  assert.equal(state.decision.decision, 'ATTENDRE');
+});
+
+test('manual sourcing rejects blank product names', () => {
+  assert.equal(buildManualOpportunity('   '), null);
 });
 
 test('dashboard runtime changes decision when confidence is insufficient', () => {
