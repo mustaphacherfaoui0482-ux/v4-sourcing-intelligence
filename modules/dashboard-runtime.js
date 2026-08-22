@@ -62,7 +62,7 @@ export function calculateDashboardState(opportunity = DEMO_OPPORTUNITY) {
       demand: opportunity.demandScore,
       margin: economics.netContributionMargin,
       availability: opportunity.availability,
-      landedCost: opportunity.landedCostScore,
+      landedCost: opportunity.offer.landedCost,
       risk: opportunity.riskScore,
       easeOfTest: opportunity.easeOfTest,
       dataConfidence: opportunity.confidence,
