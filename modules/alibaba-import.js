@@ -1,3 +1,5 @@
+import { buildAlibabaOpportunity } from './alibaba-opportunity.js';
+
 /**
  * Alibaba assisted import.
  * No scraping, no fabricated values, no automatic scoring.
@@ -6,6 +8,7 @@
 
 const SOURCE = 'Alibaba.com';
 const KEY = 'v4-sourcing.alibaba-import.v1';
+const ACTIVE_KEY = 'v4-sourcing.active-opportunity.v1';
 
 function normalizeUrl(value) {
   try {
@@ -39,7 +42,7 @@ export function renderAlibabaImport(root = document) {
       <form data-v4-alibaba-form style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px">
         ${field('URL produit *', 'url', 'url', 'https://www.alibaba.com/...')}
         ${field('Produit', 'product', 'text', 'Nom exact visible sur la fiche')}
-        ${field('Prix affiché', 'price', 'number', 'Ex. 4.80')}
+        ${field('Prix affiché', 'price', 'number', 'Ex. 4.80')} 
         ${field('MOQ', 'moq', 'number', 'Ex. 100')}
         ${field('Fournisseur', 'supplier', 'text', 'Nom visible')}
         ${field('Pays fournisseur', 'country', 'text', 'Ex. China')}
@@ -79,10 +82,15 @@ export function renderAlibabaImport(root = document) {
       confidence: 'UNKNOWN',
     });
 
-    try { localStorage.setItem(KEY, JSON.stringify(evidence)); } catch {}
-    output.innerHTML = `<div class="evidence"><span class="pbadge">EVIDENCE</span><span class="pbadge">SOURCE : ALIBABA.COM</span><span class="pbadge">CONFIDENCE : UNKNOWN</span></div><div class="diagnostic" style="margin-top:10px">${evidence.product || 'Produit non renseigné'} · Prix : ${evidence.displayedPrice ?? '—'} · MOQ : ${evidence.moq ?? '—'} · Fournisseur : ${evidence.supplier || '—'}<br><span class="sub">URL source enregistrée. Ces données ne sont pas encore validées par V4 et n'alimentent pas automatiquement le score.</span></div>`;
-    status.textContent = 'Statut : evidence Alibaba enregistrée';
-    document.dispatchEvent(new CustomEvent('v4:alibaba-evidence', { detail: evidence }));
+    const opportunity = buildAlibabaOpportunity(evidence);
+    try {
+      localStorage.setItem(KEY, JSON.stringify(evidence));
+      if (opportunity) localStorage.setItem(ACTIVE_KEY, JSON.stringify(opportunity));
+    } catch {}
+
+    output.innerHTML = `<div class="evidence"><span class="pbadge">EVIDENCE</span><span class="pbadge">OPPORTUNITY : P1</span><span class="pbadge">SOURCE : ALIBABA.COM</span><span class="pbadge">CONFIDENCE : UNKNOWN</span></div><div class="diagnostic" style="margin-top:10px">${evidence.product || 'Produit non renseigné'} · Prix : ${evidence.displayedPrice ?? '—'} · MOQ : ${evidence.moq ?? '—'} · Fournisseur : ${evidence.supplier || '—'}<br><span class="sub">La fiche est maintenant enregistrée comme opportunité V4 P1. Les valeurs économiques manquantes restent inconnues et aucun score n'est calculé à partir d'elles.</span></div>`;
+    status.textContent = 'Statut : evidence Alibaba → opportunité V4 enregistrée';
+    document.dispatchEvent(new CustomEvent('v4:alibaba-evidence', { detail: { evidence, opportunity } }));
   });
 }
 
