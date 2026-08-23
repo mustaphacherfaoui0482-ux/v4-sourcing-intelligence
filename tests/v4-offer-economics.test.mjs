@@ -35,4 +35,24 @@ const decision = evaluateOpportunity({
 assert.notEqual(decision.decision, DECISIONS.REJECT);
 assert(decision.offer);
 
+test('missing economics remain unknown instead of zero', () => {
+  const unknown = calculateOfferEconomics({
+    salePrice: null,
+    landedCost: null,
+    variableFees: null,
+    cac: null,
+    targetMargin: 30,
+  });
+
+  assert.equal(unknown.status, 'insufficient_data');
+  assert.equal(unknown.inputs.salePrice, null);
+  assert.equal(unknown.contributionAfterAds, null);
+  assert.equal(unknown.breakEvenSalePrice, null);
+
+  const unknownScenarios = simulateOfferScenarios({ salePrice: null, landedCost: null, variableFees: null, cac: null, targetMargin: 30 });
+  assert.equal(unknownScenarios[0].orders, null);
+  assert.equal(unknownScenarios[0].contribution, null);
+  assert.equal(unknownScenarios[0].profitablePerOrder, null);
+});
+
 console.log('V4 offer economics tests: PASS');
