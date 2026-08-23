@@ -12,6 +12,14 @@ function mount() {
   }
 }
 
+function focusAlibabaUrl(panel) {
+  const input = panel?.querySelector('[data-alibaba-field="url"]');
+  if (!input) return false;
+  input.focus({ preventScroll: true });
+  input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  return true;
+}
+
 function mountQuickAction(panel) {
   if (document.querySelector('[data-v4-alibaba-quick-action]')) return;
   const actions = document.querySelector('.hero .actions');
@@ -21,7 +29,14 @@ function mountQuickAction(panel) {
   button.type = 'button';
   button.dataset.v4AlibabaQuickAction = 'true';
   button.textContent = '＋ Import Alibaba';
-  button.addEventListener('click', () => panel.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  button.addEventListener('click', () => {
+    const currentPanel = document.querySelector('[data-v4-alibaba-import]') || panel;
+    if (!currentPanel) {
+      mount();
+      return;
+    }
+    focusAlibabaUrl(currentPanel);
+  });
   actions.prepend(button);
 }
 
