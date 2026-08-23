@@ -8,6 +8,14 @@ function send(res, status, body) {
   return res.end(JSON.stringify(body));
 }
 
+function extractionStatus(extracted = {}) {
+  const keys = ['product', 'displayedPrice', 'moq', 'supplier', 'supplierCountry'];
+  const present = keys.filter((key) => extracted[key] !== null && extracted[key] !== undefined && String(extracted[key]).trim() !== '').length;
+  if (present === 0) return 'EMPTY';
+  if (present === keys.length) return 'COMPLETE';
+  return 'PARTIAL';
+}
+
 async function fetchAlibabaPage(url) {
   let current = url;
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -52,13 +60,16 @@ export default async function handler(req, res) {
 
     const fetched = await fetchAlibabaPage(url);
     const extracted = parseAlibabaProductHtml(fetched.html);
+    const status = extractionStatus(extracted);
 
     return send(res, 200, {
       ok: true,
       source: 'Alibaba.com',
       sourceUrl: fetched.url,
       extracted,
-      fetchStatus: extracted.parserStatus === 'NO_STRUCTURED_DATA' ? 'page_retrieved_no_structured_data' : 'page_retrieved',
+      fetchStatus: 'page_retrieved',
+      extractionStatus: status,
+      evidenceStatus: status === 'EMPTY' ? 'INSUFFICIENT' : status === 'COMPLETE' ? 'EXTRACTED' : 'PARTIAL',
     });
   } catch (error) {
     return send(res, 200, {
@@ -67,6 +78,8 @@ export default async function handler(req, res) {
       error: error instanceof Error ? error.message : 'alibaba_fetch_failed',
       extracted: { product: null, displayedPrice: null, moq: null, supplier: null, supplierCountry: null },
       fetchStatus: 'fetch_failed',
+      extractionStatus: 'EMPTY',
+      evidenceStatus: 'UNKNOWN',
     });
   }
 }
