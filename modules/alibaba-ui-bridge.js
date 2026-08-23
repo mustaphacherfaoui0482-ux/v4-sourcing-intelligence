@@ -15,8 +15,11 @@ function mount() {
 function focusAlibabaUrl(panel) {
   const input = panel?.querySelector('[data-alibaba-field="url"]');
   if (!input) return false;
-  input.focus({ preventScroll: true });
-  input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  window.setTimeout(() => {
+    input.focus({ preventScroll: true });
+    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 80);
   return true;
 }
 
@@ -35,12 +38,27 @@ function mountQuickAction(panel) {
       mount();
       return;
     }
-    focusAlibabaUrl(currentPanel);
+    if (!focusAlibabaUrl(currentPanel)) {
+      currentPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   });
   actions.prepend(button);
 }
 
-// RED TEAM navigation fix: Radar must open the Radar view without creating a manual P0 opportunity.
+function wireQuickActionFallback() {
+  if (document.documentElement.dataset.v4AlibabaQuickActionFix === 'ready') return;
+  document.documentElement.dataset.v4AlibabaQuickActionFix = 'ready';
+  document.addEventListener('click', (event) => {
+    const button = event.target?.closest?.('[data-v4-alibaba-quick-action]');
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const panel = document.querySelector('[data-v4-alibaba-import]');
+    if (panel) focusAlibabaUrl(panel);
+    else mount();
+  }, true);
+}
+
 function wireRadarNavigation() {
   if (document.documentElement.dataset.v4RadarNavigationFix === 'ready') return;
   document.documentElement.dataset.v4RadarNavigationFix = 'ready';
@@ -58,6 +76,7 @@ function wireRadarNavigation() {
 
 function boot() {
   mount();
+  wireQuickActionFallback();
   wireRadarNavigation();
 }
 
