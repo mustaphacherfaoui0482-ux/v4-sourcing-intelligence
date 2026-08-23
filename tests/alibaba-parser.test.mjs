@@ -25,9 +25,10 @@ test('Alibaba parser extracts explicit JSON-LD product and offer values', () => 
 
 test('Alibaba parser leaves missing values null instead of inventing them', () => {
   const parsed = parseAlibabaProductHtml('<html><head><title>Alibaba</title></head><body>Access denied</body></html>');
-  assert.equal(parsed.product, 'Alibaba');
+  assert.equal(parsed.product, null);
   assert.equal(parsed.displayedPrice, null);
   assert.equal(parsed.moq, null);
   assert.equal(parsed.supplier, null);
   assert.equal(parsed.supplierCountry, null);
+  assert.equal(parsed.parserStatus, 'NO_STRUCTURED_DATA');
 });
