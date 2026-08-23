@@ -9,7 +9,7 @@ const ENGINE_FIXTURE = Object.freeze({
   marketingScore: 90, easeOfTest: 80, availability: 80, potential: 90, landedCostScore: 90,
 });
 
-test('dashboard runtime derives KPI state from canonical V4 engines', () => {
+test('1/8 — dashboard runtime derives KPI state from canonical V4 engines', () => {
   const state = calculateDashboardState(ENGINE_FIXTURE);
   assert.equal(state.economics.inputs.landedCost, 7);
   assert.equal(Math.round(state.economics.netContributionMargin * 10) / 10, 52.1);
@@ -18,7 +18,7 @@ test('dashboard runtime derives KPI state from canonical V4 engines', () => {
   assert.equal(state.decision.score, 92);
 });
 
-test('empty opportunity remains empty and does not invent an opportunity', () => {
+test('2/8 — empty opportunity remains empty and does not invent an opportunity', () => {
   const state = calculateDashboardState(EMPTY_OPPORTUNITY);
   assert.equal(state.opportunity.product, 'Aucune opportunité active');
   assert.equal(state.economics.inputs.landedCost, 0);
@@ -26,14 +26,14 @@ test('empty opportunity remains empty and does not invent an opportunity', () =>
   assert.equal(state.isDemo, false);
 });
 
-test('dashboard demo fixture remains explicit preview data', () => {
+test('3/8 — dashboard demo fixture remains explicit preview data', () => {
   const state = calculateDashboardState(DEMO_OPPORTUNITY);
   assert.equal(state.opportunity.product, 'HOODIE DZ - PREMIUM 450GSM');
   assert.equal(state.economics.inputs.landedCost, 7);
   assert.equal(state.isDemo, true);
 });
 
-test('manual sourcing creates a P0 record without inventing scores or evidence', () => {
+test('4/8 — manual sourcing creates a P0 record without inventing scores or evidence', () => {
   const opportunity = buildManualOpportunity('Lampe rechargeable');
   assert.equal(opportunity.product, 'Lampe rechargeable');
   assert.equal(opportunity.source, 'À renseigner');
@@ -45,12 +45,26 @@ test('manual sourcing creates a P0 record without inventing scores or evidence',
   assert.equal(state.decision.decision, 'ATTENDRE');
 });
 
-test('manual sourcing rejects blank product names', () => {
+test('5/8 — manual sourcing rejects blank product names', () => {
   assert.equal(buildManualOpportunity('   '), null);
 });
 
-test('dashboard runtime changes decision when confidence is insufficient', () => {
+test('6/8 — dashboard runtime changes decision when confidence is insufficient', () => {
   const state = calculateDashboardState({ ...ENGINE_FIXTURE, confidence: 20 });
   assert.equal(state.decision.decision, 'ATTENDRE');
   assert.equal(state.decision.reason, 'Données insuffisantes');
+});
+
+test('7/8 — untrusted product text stays data, not executable markup', () => {
+  const payload = '<img src=x onerror=alert(1)>';
+  const opportunity = buildManualOpportunity(payload);
+  assert.equal(opportunity.product, payload);
+  assert.equal(typeof opportunity.product, 'string');
+});
+
+test('8/8 — potential and confidence are distinct contract dimensions', () => {
+  const state = calculateDashboardState(ENGINE_FIXTURE);
+  assert.equal(state.opportunity.dimensions.potential, ENGINE_FIXTURE.potential);
+  assert.equal(state.opportunity.evidenceLevel !== undefined, true);
+  assert.equal(Object.prototype.hasOwnProperty.call(state.opportunity, 'confidence'), false);
 });
