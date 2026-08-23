@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import test from 'node:test';
 import calculateOfferEconomics, { simulateOfferScenarios } from '../modules/v4-offer-economics-engine.js';
 import { evaluateOfferForDecision } from '../modules/v4-offer-engine-adapter.js';
 import { evaluateOpportunity, DECISIONS } from '../modules/decision-engine.js';
