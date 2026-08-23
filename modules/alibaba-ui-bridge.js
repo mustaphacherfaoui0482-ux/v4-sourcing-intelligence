@@ -1,4 +1,14 @@
 import { renderAlibabaImport } from './alibaba-import.js';
+import { initDashboardRuntime } from './dashboard-runtime.js';
+
+function resetStaleEmptyOpportunity() {
+  try {
+    const raw = localStorage.getItem('v4-sourcing.active-opportunity.v1');
+    if (!raw) return;
+    const value = JSON.parse(raw);
+    if (value?.product === 'Aucune opportunité active') localStorage.removeItem('v4-sourcing.active-opportunity.v1');
+  } catch {}
+}
 
 function mount() {
   try {
@@ -34,13 +44,8 @@ function mountQuickAction(panel) {
   button.textContent = '＋ Import Alibaba';
   button.addEventListener('click', () => {
     const currentPanel = document.querySelector('[data-v4-alibaba-import]') || panel;
-    if (!currentPanel) {
-      mount();
-      return;
-    }
-    if (!focusAlibabaUrl(currentPanel)) {
-      currentPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    if (!currentPanel) return mount();
+    if (!focusAlibabaUrl(currentPanel)) currentPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   actions.prepend(button);
 }
@@ -54,8 +59,7 @@ function wireQuickActionFallback() {
     event.preventDefault();
     event.stopPropagation();
     const panel = document.querySelector('[data-v4-alibaba-import]');
-    if (panel) focusAlibabaUrl(panel);
-    else mount();
+    if (panel) focusAlibabaUrl(panel); else mount();
   }, true);
 }
 
@@ -74,10 +78,25 @@ function wireRadarNavigation() {
   }, true);
 }
 
+function wireImportRuntimeSync() {
+  if (document.documentElement.dataset.v4AlibabaRuntimeSync === 'ready') return;
+  document.documentElement.dataset.v4AlibabaRuntimeSync = 'ready';
+  document.addEventListener('v4:alibaba-evidence', (event) => {
+    const opportunity = event.detail?.opportunity;
+    if (opportunity) initDashboardRuntime(opportunity);
+    else initDashboardRuntime();
+  });
+}
+
 function boot() {
+  resetStaleEmptyOpportunity();
   mount();
   wireQuickActionFallback();
   wireRadarNavigation();
+  wireImportRuntimeSync();
+  if (document.documentElement.dataset.v4Runtime === 'ready' && !window.V4SourcingRuntime?.isDemo && window.V4SourcingRuntime?.opportunity?.product === 'Aucune opportunité active') {
+    initDashboardRuntime();
+  }
 }
 
 if (typeof document !== 'undefined') {
