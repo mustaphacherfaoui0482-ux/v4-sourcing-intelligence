@@ -11,7 +11,28 @@ function mount() {
   }
 }
 
+// RED TEAM navigation fix: Radar must open the Radar view without creating a manual P0 opportunity.
+function wireRadarNavigation() {
+  if (document.documentElement.dataset.v4RadarNavigationFix === 'ready') return;
+  document.documentElement.dataset.v4RadarNavigationFix = 'ready';
+  document.addEventListener('click', (event) => {
+    const link = event.target?.closest?.('.nav a');
+    if (!link || !/Radar Sourcing/i.test(link.textContent || '')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    document.querySelectorAll('.nav a').forEach((x) => x.classList.remove('on'));
+    link.classList.add('on');
+    const target = document.querySelector('[data-v4-alibaba-import]') || document.querySelector('.radar');
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, true);
+}
+
+function boot() {
+  mount();
+  wireRadarNavigation();
+}
+
 if (typeof document !== 'undefined') {
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, { once: true });
-  else mount();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot, { once: true });
+  else boot();
 }
