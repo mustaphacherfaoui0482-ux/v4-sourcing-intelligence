@@ -1,5 +1,5 @@
-// V4 Sourcing Intelligence — Decision Engine v2
-// Deterministic decision rules. UI/CSS dependencies are intentionally excluded.
+// V4 Sourcing Intelligence — Decision Engine v3
+// Deterministic decision rules. Unknown inputs remain unknown and cannot be converted into a score.
 
 import { evaluateOfferForDecision } from './v4-offer-engine-adapter.js';
 
@@ -11,15 +11,16 @@ export const DECISIONS = {
 };
 
 function clampScore(value) {
+  if (value === null || value === undefined || value === '') return null;
   const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return 0;
+  if (!Number.isFinite(numeric)) return null;
   return Math.max(0, Math.min(100, numeric));
 }
 
 export function evaluateOpportunity(data = {}) {
   const demand = clampScore(data.demandScore);
   const sourcing = clampScore(data.sourcingScore);
-  const risk = clampScore(data.riskScore ?? 100);
+  const risk = clampScore(data.riskScore);
   const confidence = clampScore(data.confidence);
 
   let profitability = clampScore(data.profitabilityScore);
@@ -27,16 +28,53 @@ export function evaluateOpportunity(data = {}) {
 
   if (data.offer) {
     offer = evaluateOfferForDecision(data.offer);
+    if (offer.economics.status === 'insufficient_data') {
+      return {
+        decision: DECISIONS.WAIT,
+        score: null,
+        profitability: null,
+        offer,
+        reason: 'Données économiques insuffisantes',
+      };
+    }
+
     const marginScore = clampScore(offer.economics.netContributionMargin * 2);
+    const resilience = clampScore(offer.resilience);
+    if (profitability === null || marginScore === null || resilience === null) {
+      return {
+        decision: DECISIONS.WAIT,
+        score: null,
+        profitability: null,
+        offer,
+        reason: 'Données insuffisantes pour calculer la rentabilité',
+      };
+    }
+
     profitability = Math.round(
       profitability * 0.4 +
       marginScore * 0.4 +
-      offer.resilience * 0.2,
+      resilience * 0.2,
     );
 
     if (offer.economics.status === 'loss') {
       profitability = Math.min(profitability, 20);
     }
+  }
+
+  if (
+    demand === null ||
+    sourcing === null ||
+    profitability === null ||
+    confidence === null ||
+    risk === null
+  ) {
+    return {
+      decision: DECISIONS.WAIT,
+      score: null,
+      profitability,
+      offer,
+      reason: 'Données insuffisantes',
+    };
   }
 
   const score = Math.round(
