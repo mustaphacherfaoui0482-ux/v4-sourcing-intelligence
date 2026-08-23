@@ -62,7 +62,8 @@ function guardUnknownDashboardValues(root = document) {
 
   normalizeAlibabaPriceInput(root);
 
-  const unknownScore = state.opportunity.score == null || state.opportunity.scoreStatus === 'insufficient_data';
+  const p0WithoutVerifiedData = state.opportunity.evidenceLevel === 'P0' && !state.isDemo;
+  const unknownScore = p0WithoutVerifiedData || state.opportunity.score == null || state.opportunity.scoreStatus === 'insufficient_data';
   if (unknownScore) {
     const gauge = root.querySelector('.kpis .kpi .gauge');
     if (gauge) {
@@ -79,7 +80,7 @@ function guardUnknownDashboardValues(root = document) {
   const dimensions = state.opportunity.dimensions ?? {};
   const signalValues = [dimensions.potential, dimensions.demand, dimensions.margin, dimensions.risk];
   root.querySelectorAll('.signals .sig span').forEach((node, index) => {
-    if (index < 4 && (signalValues[index] == null || !Number.isFinite(Number(signalValues[index])))) {
+    if (index < 4 && (p0WithoutVerifiedData || signalValues[index] == null || !Number.isFinite(Number(signalValues[index])))) {
       node.textContent = 'UNKNOWN';
     }
   });
