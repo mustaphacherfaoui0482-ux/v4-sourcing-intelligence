@@ -1,14 +1,18 @@
 /**
  * Converts explicit Alibaba evidence into a canonical V4 opportunity shell.
  * Missing product identity is not enough to create an opportunity.
- * Missing economics remain unknown; no score or decision is fabricated.
+ * Missing economics and scoring inputs remain unknown; no score is fabricated.
  */
 export function buildAlibabaOpportunity(evidence = {}) {
   const product = String(evidence.product ?? '').trim() || null;
 
-  // Evidence can exist without an opportunity. Do not promote an
-  // unidentified Alibaba URL into the canonical opportunity model.
   if (!product) return null;
+
+  const knownNumber = (value) => (
+    typeof value === 'number' && Number.isFinite(value) ? value : null
+  );
+
+  const displayedPrice = knownNumber(evidence.displayedPrice);
 
   return Object.freeze({
     id: `alibaba-${Date.now()}`,
@@ -19,23 +23,24 @@ export function buildAlibabaOpportunity(evidence = {}) {
     evidenceLevel: 'P1',
     evidence: Object.freeze({ ...evidence }),
     offer: {
-      salePrice: 0,
-      landedCost: 0,
-      variableFees: 0,
-      cac: 0,
+      salePrice: null,
+      landedCost: null,
+      variableFees: null,
+      cac: null,
       targetMargin: 30,
-      visitors: 0,
-      conversionRate: 0,
+      visitors: null,
+      conversionRate: null,
+      supplierPrice: displayedPrice,
     },
-    demandScore: 0,
-    sourcingScore: 0,
-    profitabilityScore: 0,
-    riskScore: 0,
-    confidence: 0,
-    marketingScore: 0,
-    easeOfTest: 0,
-    availability: 0,
-    potential: 0,
-    landedCostScore: 0,
+    demandScore: null,
+    sourcingScore: null,
+    profitabilityScore: null,
+    riskScore: null,
+    confidence: null,
+    marketingScore: null,
+    easeOfTest: null,
+    availability: null,
+    potential: null,
+    landedCostScore: null,
   });
 }
