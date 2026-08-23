@@ -14,6 +14,9 @@ export function buildRadarOpportunity(input = {}) {
   const economics = input.economics ?? {};
   const dimensions = input.dimensions ?? {};
   const decision = input.decision ?? null;
+  // Alibaba opportunities are P1 when the source is the canonical Alibaba.com channel.
+  // An explicitly supplied evidence level always takes precedence.
+  const evidenceLevel = input.evidenceLevel ?? (input.source === 'Alibaba.com' ? 'P1' : undefined);
 
   const productSignals = product.signals ?? product.factors ?? product;
   const supplierFactors = supplier.factors ?? supplier;
@@ -44,6 +47,7 @@ export function buildRadarOpportunity(input = {}) {
     supplier: supplier.result ?? supplier,
     economics,
     evidence: input.evidence,
+    evidenceLevel,
     createdAt: input.createdAt,
   });
 
