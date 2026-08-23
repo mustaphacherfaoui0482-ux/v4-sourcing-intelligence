@@ -7,13 +7,33 @@ const ACTIVE_KEY = 'v4-sourcing.active-opportunity.v1';
 function normalizeUrl(value) {
   try {
     const url = new URL(String(value || '').trim());
-    if (!/^(www\.)?alibaba\.com$/i.test(url.hostname)) return null;
+    if (url.protocol !== 'https:' || !/^(www\.)?alibaba\.com$/i.test(url.hostname)) return null;
     return url.href;
   } catch { return null; }
 }
 
 function field(label, key, type = 'text', placeholder = '') {
   return `<label style="display:grid;gap:5px"><span class="lab">${label}</span><input data-alibaba-field="${key}" type="${type}" placeholder="${placeholder}" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:#0b0f12;color:var(--text)"></label>`;
+}
+
+function setField(form, key, value) {
+  if (value == null || value === '') return;
+  const input = form.querySelector(`[data-alibaba-field="${key}"]`);
+  if (input && !String(input.value || '').trim()) input.value = String(value);
+}
+
+async function fetchAlibabaData(url) {
+  try {
+    const response = await fetch('/api/alibaba-import', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const payload = await response.json();
+    return payload?.ok ? payload : { ok: false, error: payload?.error || 'alibaba_import_failed', fetchStatus: payload?.fetchStatus || 'fetch_failed', extracted: payload?.extracted || {} };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'alibaba_import_failed', fetchStatus: 'client_fetch_failed', extracted: {} };
+  }
 }
 
 export function renderAlibabaImport(root = document) {
@@ -27,7 +47,7 @@ export function renderAlibabaImport(root = document) {
   section.innerHTML = `
     <div class="card panel">
       <div class="panelHead"><h2>Alibaba — Import assisté</h2><span class="pbadge">SOURCE : ALIBABA.COM</span></div>
-      <div class="diagnostic">Collez une URL Alibaba et renseignez uniquement les données visibles sur la fiche. V4 les conserve comme <b>evidence</b> ; aucune donnée n'est inventée.</div>
+      <div class="diagnostic">Collez une URL Alibaba. V4 tente de lire les données explicitement présentes dans la fiche ; si Alibaba bloque la lecture, vous pouvez compléter manuellement. <b>Aucune donnée économique n'est inventée.</b></div>
       <form data-v4-alibaba-form style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px">
         ${field('URL produit *', 'url', 'url', 'https://www.alibaba.com/...')}
         ${field('Produit', 'product', 'text', 'Nom exact visible sur la fiche')}
@@ -35,7 +55,7 @@ export function renderAlibabaImport(root = document) {
         ${field('MOQ', 'moq', 'number', 'Ex. 100')}
         ${field('Fournisseur', 'supplier', 'text', 'Nom visible')}
         ${field('Pays fournisseur', 'country', 'text', 'Ex. China')}
-        <div style="grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" type="submit">＋ Ajouter l'evidence Alibaba</button><span class="sub" data-v4-alibaba-status>Statut : aucune donnée importée</span></div>
+        <div style="grid-column:1/-1;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn primary" type="submit">＋ Importer la fiche Alibaba</button><span class="sub" data-v4-alibaba-status>Statut : aucune donnée importée</span></div>
       </form>
       <div data-v4-alibaba-evidence style="margin-top:12px"></div>
     </div>`;
@@ -45,7 +65,7 @@ export function renderAlibabaImport(root = document) {
   const status = section.querySelector('[data-v4-alibaba-status]');
   const output = section.querySelector('[data-v4-alibaba-evidence]');
 
-  form.addEventListener('submit', (event) => {
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
     event.stopPropagation();
     const value = (key) => form.querySelector(`[data-alibaba-field="${key}"]`)?.value?.trim() || '';
@@ -57,12 +77,30 @@ export function renderAlibabaImport(root = document) {
       return;
     }
 
+    status.textContent = 'Statut : lecture de la fiche Alibaba…';
+    output.innerHTML = '<div class="diagnostic">V4 tente de récupérer uniquement les données visibles disponibles dans la réponse de la fiche.</div>';
+
+    const imported = await fetchAlibabaData(url);
+    const extracted = imported.extracted || {};
+    setField(form, 'product', extracted.product);
+    setField(form, 'price', extracted.displayedPrice);
+    setField(form, 'moq', extracted.moq);
+    setField(form, 'supplier', extracted.supplier);
+    setField(form, 'country', extracted.supplierCountry);
+
     const evidence = Object.freeze({
-      source: SOURCE, sourceUrl: url, product: value('product') || null,
+      source: SOURCE,
+      sourceUrl: imported.sourceUrl || url,
+      product: value('product') || null,
       displayedPrice: value('price') ? Number(value('price')) : null,
       moq: value('moq') ? Number(value('moq')) : null,
-      supplier: value('supplier') || null, supplierCountry: value('country') || null,
-      capturedAt: new Date().toISOString(), evidenceStatus: 'USER_SUPPLIED', confidence: 'UNKNOWN',
+      supplier: value('supplier') || null,
+      supplierCountry: value('country') || null,
+      capturedAt: new Date().toISOString(),
+      evidenceStatus: imported.ok ? 'FETCHED_VISIBLE_DATA' : 'USER_SUPPLIED',
+      fetchStatus: imported.fetchStatus || 'fetch_failed',
+      importError: imported.ok ? null : imported.error,
+      confidence: 'UNKNOWN',
     });
     const opportunity = buildAlibabaOpportunity(evidence);
 
@@ -73,14 +111,18 @@ export function renderAlibabaImport(root = document) {
     } catch {}
 
     if (!opportunity) {
-      output.innerHTML = '<div class="evidence"><span class="pbadge">EVIDENCE P1</span><span class="pbadge">SOURCE : ALIBABA.COM</span><span class="pbadge">CONFIDENCE : UNKNOWN</span></div><div class="diagnostic" style="margin-top:10px">Preuve Alibaba enregistrée. <b>Nom du produit manquant :</b> renseignez le nom exact visible sur la fiche pour créer l’opportunité P1.</div>';
-      status.textContent = 'Statut : evidence enregistrée · identité produit requise';
+      const reason = imported.ok
+        ? 'La fiche a été lue mais aucune identité produit exploitable n’a été trouvée.'
+        : 'Alibaba n’a pas pu être lu automatiquement. Renseignez les données visibles sur la fiche pour poursuivre.';
+      output.innerHTML = `<div class="evidence"><span class="pbadge">EVIDENCE P1</span><span class="pbadge">SOURCE : ALIBABA.COM</span><span class="pbadge">CONFIDENCE : UNKNOWN</span></div><div class="diagnostic" style="margin-top:10px"><b>Preuve Alibaba enregistrée.</b> ${reason}<br><span class="sub">Aucune valeur n’a été inventée.</span></div>`;
+      status.textContent = imported.ok ? 'Statut : fiche lue · identité produit requise' : 'Statut : lecture automatique indisponible · saisie manuelle possible';
       document.dispatchEvent(new CustomEvent('v4:alibaba-evidence', { detail: { evidence, opportunity: null } }));
       return;
     }
 
-    output.innerHTML = `<div class="evidence"><span class="pbadge">EVIDENCE P1</span><span class="pbadge">OPPORTUNITY : P1</span><span class="pbadge">SOURCE : ALIBABA.COM</span><span class="pbadge">CONFIDENCE : UNKNOWN</span></div><div class="diagnostic" style="margin-top:10px">${evidence.product} · Prix : ${evidence.displayedPrice ?? '—'} · MOQ : ${evidence.moq ?? '—'} · Fournisseur : ${evidence.supplier || '—'}<br><span class="sub">Opportunité P1 enregistrée. Les valeurs économiques manquantes restent inconnues.</span></div>`;
-    status.textContent = 'Statut : opportunité V4 P1 enregistrée';
+    const importLabel = imported.ok ? 'Données visibles importées' : 'Données saisies manuellement';
+    output.innerHTML = `<div class="evidence"><span class="pbadge">EVIDENCE P1</span><span class="pbadge">OPPORTUNITY : P1</span><span class="pbadge">SOURCE : ALIBABA.COM</span><span class="pbadge">CONFIDENCE : UNKNOWN</span></div><div class="diagnostic" style="margin-top:10px"><b>${importLabel}</b> · ${evidence.product} · Prix : ${evidence.displayedPrice ?? '—'} · MOQ : ${evidence.moq ?? '—'} · Fournisseur : ${evidence.supplier || '—'}<br><span class="sub">Opportunité P1 enregistrée. Les valeurs économiques manquantes restent inconnues.</span></div>`;
+    status.textContent = imported.ok ? 'Statut : import Alibaba terminé · opportunité V4 P1' : 'Statut : opportunité V4 P1 créée depuis les données saisies';
     document.dispatchEvent(new CustomEvent('v4:alibaba-evidence', { detail: { evidence, opportunity } }));
   });
 }
