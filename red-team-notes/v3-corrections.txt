@@ -1,1 +1,0 @@
-RED TEAM V3 corrections. Baseline protected: 564ac177982e94bdbee1b5da6078f2a57960c48d. Corrections: remove demo prefill, remove fake timed sourcing progression, make Radar navigation non-mutating, fix duplicate percent rendering. No production deployment from this branch.
