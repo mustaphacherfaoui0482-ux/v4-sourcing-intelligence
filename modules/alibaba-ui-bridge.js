@@ -1,5 +1,5 @@
 import { renderAlibabaImport } from './alibaba-import.js';
-import { initDashboardRuntime } from './dashboard-runtime.js';
+import { EMPTY_OPPORTUNITY, initDashboardRuntime } from './dashboard-runtime.js';
 
 function resetStaleEmptyOpportunity() {
   try {
@@ -97,8 +97,7 @@ function wireImportRuntimeSync() {
   document.documentElement.dataset.v4AlibabaRuntimeSync = 'ready';
   document.addEventListener('v4:alibaba-evidence', (event) => {
     const opportunity = event.detail?.opportunity;
-    if (opportunity) initDashboardRuntime(opportunity);
-    else initDashboardRuntime();
+    initDashboardRuntime(opportunity || EMPTY_OPPORTUNITY);
   });
 }
 
@@ -109,7 +108,7 @@ function boot() {
   wireRadarNavigation();
   wireImportRuntimeSync();
   if (document.documentElement.dataset.v4Runtime === 'ready' && !window.V4SourcingRuntime?.isDemo && window.V4SourcingRuntime?.opportunity?.product === 'Aucune opportunité active') {
-    initDashboardRuntime();
+    initDashboardRuntime(EMPTY_OPPORTUNITY);
   }
 }
 
