@@ -1,9 +1,14 @@
 /**
  * Converts explicit Alibaba evidence into a canonical V4 opportunity shell.
+ * Missing product identity is not enough to create an opportunity.
  * Missing economics remain unknown; no score or decision is fabricated.
  */
 export function buildAlibabaOpportunity(evidence = {}) {
   const product = String(evidence.product ?? '').trim() || null;
+
+  // Evidence can exist without an opportunity. Do not promote an
+  // unidentified Alibaba URL into the canonical opportunity model.
+  if (!product) return null;
 
   return Object.freeze({
     id: `alibaba-${Date.now()}`,
