@@ -5,7 +5,12 @@
 
 import { normalizeEvidenceLevel } from './evidence-level.js';
 
-const clamp = (value) => Math.max(0, Math.min(100, Number(value) || 0));
+const clamp = (value) => {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return Math.max(0, Math.min(100, n));
+};
 
 export function createOpportunity(input = {}) {
   return {
