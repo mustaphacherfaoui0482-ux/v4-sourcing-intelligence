@@ -12,8 +12,17 @@ function normalizeUrl(value) {
   } catch { return null; }
 }
 
+function parseDecimal(value) {
+  const raw = String(value ?? '').trim().replace(/\s/g, '').replace(',', '.');
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+}
+
 function field(label, key, type = 'text', placeholder = '') {
-  return `<label style="display:grid;gap:5px"><span class="lab">${label}</span><input data-alibaba-field="${key}" type="${type}" placeholder="${placeholder}" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:#0b0f12;color:var(--text)"></label>`;
+  const inputType = key === 'price' ? 'text' : type;
+  const inputMode = key === 'price' ? 'decimal' : '';
+  return `<label style="display:grid;gap:5px"><span class="lab">${label}</span><input data-alibaba-field="${key}" type="${inputType}" ${inputMode ? `inputmode="${inputMode}"` : ''} placeholder="${placeholder}" style="width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:7px;background:#0b0f12;color:var(--text)"></label>`;
 }
 
 function setField(form, key, value) {
@@ -51,7 +60,7 @@ export function renderAlibabaImport(root = document) {
       <form data-v4-alibaba-form style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px">
         ${field('URL produit *', 'url', 'url', 'https://www.alibaba.com/...')}
         ${field('Produit', 'product', 'text', 'Nom exact visible sur la fiche')}
-        ${field('Prix affiché', 'price', 'number', 'Ex. 4.80')}
+        ${field('Prix affiché', 'price', 'text', 'Ex. 4,80 ou 4.80')}
         ${field('MOQ', 'moq', 'number', 'Ex. 100')}
         ${field('Fournisseur', 'supplier', 'text', 'Nom visible')}
         ${field('Pays fournisseur', 'country', 'text', 'Ex. China')}
@@ -88,12 +97,15 @@ export function renderAlibabaImport(root = document) {
     setField(form, 'supplier', extracted.supplier);
     setField(form, 'country', extracted.supplierCountry);
 
+    const parsedPrice = parseDecimal(value('price'));
+    const rawMoq = value('moq');
+    const parsedMoq = rawMoq ? Number(rawMoq) : null;
     const evidence = Object.freeze({
       source: SOURCE,
       sourceUrl: imported.sourceUrl || url,
       product: value('product') || null,
-      displayedPrice: value('price') ? Number(value('price')) : null,
-      moq: value('moq') ? Number(value('moq')) : null,
+      displayedPrice: parsedPrice,
+      moq: Number.isFinite(parsedMoq) ? parsedMoq : null,
       supplier: value('supplier') || null,
       supplierCountry: value('country') || null,
       capturedAt: new Date().toISOString(),
