@@ -63,6 +63,21 @@ function wireQuickActionFallback() {
   }, true);
 }
 
+function focusRadar() {
+  const target = document.querySelector('.radar');
+  if (!target) return false;
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  target.animate(
+    [
+      { outline: '2px solid transparent', outlineOffset: '6px' },
+      { outline: '2px solid var(--gold)', outlineOffset: '6px' },
+      { outline: '2px solid transparent', outlineOffset: '6px' },
+    ],
+    { duration: 900, easing: 'ease-out' },
+  );
+  return true;
+}
+
 function wireRadarNavigation() {
   if (document.documentElement.dataset.v4RadarNavigationFix === 'ready') return;
   document.documentElement.dataset.v4RadarNavigationFix = 'ready';
@@ -73,8 +88,7 @@ function wireRadarNavigation() {
     event.stopImmediatePropagation();
     document.querySelectorAll('.nav a').forEach((x) => x.classList.remove('on'));
     link.classList.add('on');
-    const target = document.querySelector('[data-v4-alibaba-import]') || document.querySelector('.radar');
-    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    focusRadar();
   }, true);
 }
 
