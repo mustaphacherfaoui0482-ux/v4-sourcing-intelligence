@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildAlibabaOpportunity } from '../modules/alibaba-opportunity.js';
 
-test('Alibaba evidence becomes a P1 opportunity without fabricated economics', () => {
+test('Alibaba evidence preserves supplier price without fabricating economics', () => {
   const opportunity = buildAlibabaOpportunity({
     source: 'Alibaba.com',
     sourceUrl: 'https://www.alibaba.com/product-detail/example.html',
@@ -18,9 +18,11 @@ test('Alibaba evidence becomes a P1 opportunity without fabricated economics', (
   assert.equal(opportunity.source, 'Alibaba.com');
   assert.equal(opportunity.evidenceLevel, 'P1');
   assert.equal(opportunity.evidence.displayedPrice, 4.8);
-  assert.equal(opportunity.offer.landedCost, 0);
-  assert.equal(opportunity.offer.salePrice, 0);
-  assert.equal(opportunity.confidence, 0);
+  assert.equal(opportunity.offer.supplierPrice, 4.8);
+  assert.equal(opportunity.offer.landedCost, null);
+  assert.equal(opportunity.offer.salePrice, null);
+  assert.equal(opportunity.confidence, null);
+  assert.equal(opportunity.demandScore, null);
   assert.equal(opportunity.isDemo, false);
 });
 
