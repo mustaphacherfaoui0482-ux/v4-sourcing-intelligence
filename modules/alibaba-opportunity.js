@@ -3,8 +3,7 @@
  * Missing economics remain unknown; no score or decision is fabricated.
  */
 export function buildAlibabaOpportunity(evidence = {}) {
-  const product = String(evidence.product ?? '').trim();
-  if (!product) return null;
+  const product = String(evidence.product ?? '').trim() || null;
 
   return Object.freeze({
     id: `alibaba-${Date.now()}`,
