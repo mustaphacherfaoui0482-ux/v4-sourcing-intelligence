@@ -53,6 +53,29 @@ test('radar orchestrator integrates the official scoring engine into the opportu
   assert.equal(result.decision, 'TESTER');
 });
 
+test('radar orchestrator preserves explicit evidence level', () => {
+  const result = buildRadarOpportunity({
+    id: 'opp-evidence',
+    product: 'Alibaba manual product',
+    source: 'Alibaba.com',
+    evidenceLevel: 'P1',
+    dimensions: {},
+  });
+
+  assert.equal(result.evidenceLevel, 'P1');
+});
+
+test('radar orchestrator assigns P1 to Alibaba.com when no evidence level is supplied', () => {
+  const result = buildRadarOpportunity({
+    id: 'opp-alibaba',
+    product: 'Alibaba manual product',
+    source: 'Alibaba.com',
+    dimensions: {},
+  });
+
+  assert.equal(result.evidenceLevel, 'P1');
+});
+
 test('radar orchestrator does not invent a score when no scoring input exists', () => {
   const result = buildRadarOpportunity({
     dimensions: { demand: 80, dataConfidence: 90 },
