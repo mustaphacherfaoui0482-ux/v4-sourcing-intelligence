@@ -2,6 +2,7 @@ import { evaluateOpportunity } from './decision-engine.js';
 import { calculateOfferEconomics } from './v4-offer-economics-engine.js';
 import { buildRadarOpportunity } from './radar-orchestrator.js';
 import { toOpportunityViewModel } from './ui-adapter.js';
+import './alibaba-import.js';
 
 // Presentation-only fixture. Never treated as live sourcing evidence.
 export const DEMO_OPPORTUNITY = Object.freeze({
