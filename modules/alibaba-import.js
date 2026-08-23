@@ -82,6 +82,7 @@ export function renderAlibabaImport(root = document) {
     try { localStorage.setItem(KEY, JSON.stringify(evidence)); } catch {}
     output.innerHTML = `<div class="evidence"><span class="pbadge">EVIDENCE</span><span class="pbadge">SOURCE : ALIBABA.COM</span><span class="pbadge">CONFIDENCE : UNKNOWN</span></div><div class="diagnostic" style="margin-top:10px">${evidence.product || 'Produit non renseigné'} · Prix : ${evidence.displayedPrice ?? '—'} · MOQ : ${evidence.moq ?? '—'} · Fournisseur : ${evidence.supplier || '—'}<br><span class="sub">URL source enregistrée. Ces données ne sont pas encore validées par V4 et n'alimentent pas automatiquement le score.</span></div>`;
     status.textContent = 'Statut : evidence Alibaba enregistrée';
+    document.dispatchEvent(new CustomEvent('v4:alibaba-evidence', { detail: evidence }));
   });
 }
 
