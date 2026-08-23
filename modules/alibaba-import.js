@@ -39,9 +39,9 @@ async function fetchAlibabaData(url) {
       body: JSON.stringify({ url }),
     });
     const payload = await response.json();
-    return payload?.ok ? payload : { ok: false, error: payload?.error || 'alibaba_import_failed', fetchStatus: payload?.fetchStatus || 'fetch_failed', extracted: payload?.extracted || {} };
+    return payload?.ok ? payload : { ok: false, error: payload?.error || 'alibaba_import_failed', fetchStatus: payload?.fetchStatus || 'fetch_failed', extractionStatus: payload?.extractionStatus || 'EMPTY', evidenceStatus: payload?.evidenceStatus || 'UNKNOWN', extracted: payload?.extracted || {} };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'alibaba_import_failed', fetchStatus: 'client_fetch_failed', extracted: {} };
+    return { ok: false, error: error instanceof Error ? error.message : 'alibaba_import_failed', fetchStatus: 'client_fetch_failed', extractionStatus: 'EMPTY', evidenceStatus: 'UNKNOWN', extracted: {} };
   }
 }
 
@@ -100,6 +100,9 @@ export function renderAlibabaImport(root = document) {
     const parsedPrice = parseDecimal(value('price'));
     const rawMoq = value('moq');
     const parsedMoq = rawMoq ? Number(rawMoq) : null;
+    const hasManualData = Boolean(value('product') || value('price') || value('moq') || value('supplier') || value('country'));
+    const extractedStatus = imported.extractionStatus || 'EMPTY';
+    const isAutomaticExtraction = imported.ok && extractedStatus !== 'EMPTY';
     const evidence = Object.freeze({
       source: SOURCE,
       sourceUrl: imported.sourceUrl || url,
@@ -109,11 +112,13 @@ export function renderAlibabaImport(root = document) {
       supplier: value('supplier') || null,
       supplierCountry: value('country') || null,
       capturedAt: new Date().toISOString(),
-      evidenceStatus: imported.ok ? 'FETCHED_VISIBLE_DATA' : 'USER_SUPPLIED',
+      evidenceStatus: isAutomaticExtraction ? imported.evidenceStatus : hasManualData ? 'USER_SUPPLIED' : 'INSUFFICIENT',
       fetchStatus: imported.fetchStatus || 'fetch_failed',
+      extractionStatus: extractedStatus,
       importError: imported.ok ? null : imported.error,
       confidence: 'UNKNOWN',
     });
+
     const opportunity = buildAlibabaOpportunity(evidence);
 
     try {
@@ -123,18 +128,20 @@ export function renderAlibabaImport(root = document) {
     } catch {}
 
     if (!opportunity) {
-      const reason = imported.ok
-        ? 'La fiche a été lue mais aucune identité produit exploitable n’a été trouvée.'
-        : 'Alibaba n’a pas pu être lu automatiquement. Renseignez les données visibles sur la fiche pour poursuivre.';
-      output.innerHTML = `<div class="evidence"><span class="pbadge">EVIDENCE P1</span><span class="pbadge">SOURCE : ALIBABA.COM</span><span class="pbadge">CONFIDENCE : UNKNOWN</span></div><div class="diagnostic" style="margin-top:10px"><b>Preuve Alibaba enregistrée.</b> ${reason}<br><span class="sub">Aucune valeur n’a été inventée.</span></div>`;
-      status.textContent = imported.ok ? 'Statut : fiche lue · identité produit requise' : 'Statut : lecture automatique indisponible · saisie manuelle possible';
+      const reason = imported.ok && extractedStatus === 'EMPTY'
+        ? 'La page Alibaba a été récupérée, mais aucune donnée produit exploitable n’a été extraite.'
+        : imported.ok
+          ? 'La page Alibaba a été récupérée avec des données partielles, mais aucune identité produit exploitable n’est disponible.'
+          : 'Alibaba n’a pas pu être lu automatiquement. Renseignez les données visibles sur la fiche pour poursuivre.';
+      output.innerHTML = `<div class="evidence"><span class="pbadge">PAGE : ${imported.ok ? 'RÉCUPÉRÉE' : 'ÉCHEC'}</span><span class="pbadge">EXTRACTION : ${extractedStatus}</span><span class="pbadge">EVIDENCE : ${evidence.evidenceStatus}</span><span class="pbadge">CONFIDENCE : UNKNOWN</span></div><div class="diagnostic" style="margin-top:10px"><b>${reason}</b><br><span class="sub">Aucune opportunité ni donnée économique n’est créée automatiquement dans cet état.</span></div>`;
+      status.textContent = imported.ok ? `Statut : page lue · extraction ${extractedStatus.toLowerCase()} · identité produit requise` : 'Statut : lecture automatique indisponible · saisie manuelle possible';
       document.dispatchEvent(new CustomEvent('v4:alibaba-evidence', { detail: { evidence, opportunity: null } }));
       return;
     }
 
-    const importLabel = imported.ok ? 'Données visibles importées' : 'Données saisies manuellement';
-    output.innerHTML = `<div class="evidence"><span class="pbadge">EVIDENCE P1</span><span class="pbadge">OPPORTUNITY : P1</span><span class="pbadge">SOURCE : ALIBABA.COM</span><span class="pbadge">CONFIDENCE : UNKNOWN</span></div><div class="diagnostic" style="margin-top:10px"><b>${importLabel}</b> · ${evidence.product} · Prix : ${evidence.displayedPrice ?? '—'} · MOQ : ${evidence.moq ?? '—'} · Fournisseur : ${evidence.supplier || '—'}<br><span class="sub">Opportunité P1 enregistrée. Les valeurs économiques manquantes restent inconnues.</span></div>`;
-    status.textContent = imported.ok ? 'Statut : import Alibaba terminé · opportunité V4 P1' : 'Statut : opportunité V4 P1 créée depuis les données saisies';
+    const importLabel = isAutomaticExtraction ? 'Données Alibaba extraites' : 'Données saisies manuellement';
+    output.innerHTML = `<div class="evidence"><span class="pbadge">PAGE : RÉCUPÉRÉE</span><span class="pbadge">EXTRACTION : ${extractedStatus}</span><span class="pbadge">OPPORTUNITY : P1</span><span class="pbadge">SOURCE : ALIBABA.COM</span><span class="pbadge">CONFIDENCE : UNKNOWN</span></div><div class="diagnostic" style="margin-top:10px"><b>${importLabel}</b> · ${evidence.product} · Prix : ${evidence.displayedPrice ?? '—'} · MOQ : ${evidence.moq ?? '—'} · Fournisseur : ${evidence.supplier || '—'}<br><span class="sub">Opportunité P1 enregistrée. Les valeurs économiques manquantes restent inconnues.</span></div>`;
+    status.textContent = isAutomaticExtraction ? `Statut : import Alibaba terminé · extraction ${extractedStatus.toLowerCase()} · opportunité V4 P1` : 'Statut : opportunité V4 P1 créée depuis les données saisies';
     document.dispatchEvent(new CustomEvent('v4:alibaba-evidence', { detail: { evidence, opportunity } }));
   });
 }
