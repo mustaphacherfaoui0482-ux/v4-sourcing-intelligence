@@ -36,3 +36,18 @@ test('radar potential remains normalized to 0-100', () => {
   assert.equal(score.total, 100);
   assert.equal(score.status, 'strong_opportunity');
 });
+
+test('missing radar signal remains UNKNOWN and does not become zero', () => {
+  const score = calculateRadarScore({
+    demand: 80,
+    marketing: 70,
+    sourcing: undefined,
+    profitability: 90,
+    confidence: undefined,
+  });
+
+  assert.equal(score.total, null);
+  assert.equal(score.status, 'insufficient_data');
+  assert.equal(score.breakdown.sourcing, null);
+  assert.equal(score.breakdown.confidence, null);
+});
