@@ -1,0 +1,1 @@
+Correction branch validation note. Baseline 564ac177 remains protected. Changes are isolated to red-team/v3-corrections and are not production.
