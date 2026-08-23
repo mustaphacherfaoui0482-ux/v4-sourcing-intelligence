@@ -1,29 +1,33 @@
-class V4AlertIntelligenceEngine {
+// V4 Alert Intelligence Engine v1
+// Deterministic alert storage. No decision is made here.
+
+export class V4AlertIntelligenceEngine {
   constructor() {
     this.alerts = [];
   }
 
   createAlert(data = {}) {
     const alert = {
-      id: Date.now(),
+      id: crypto.randomUUID(),
       level: data.level || 'info',
-      message: data.message || '',
-      createdAt: new Date().toISOString()
+      message: String(data.message || ''),
+      createdAt: new Date().toISOString(),
     };
+
     this.alerts.push(alert);
     return alert;
   }
 
   getAlerts() {
-    return this.alerts;
+    return [...this.alerts];
   }
 
   getStatus() {
     return {
       module: 'v4-alert-intelligence-engine',
-      alerts: this.alerts.length
+      alerts: this.alerts.length,
     };
   }
 }
 
-module.exports = V4AlertIntelligenceEngine;
+export default V4AlertIntelligenceEngine;
