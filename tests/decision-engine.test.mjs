@@ -13,6 +13,18 @@ test('decision engine waits when confidence is insufficient', () => {
   assert.equal(result.decision, DECISIONS.WAIT);
 });
 
+test('decision engine waits when a required signal is UNKNOWN', () => {
+  const result = evaluateOpportunity({
+    demandScore: null,
+    sourcingScore: 95,
+    profitabilityScore: 95,
+    confidence: 95,
+    riskScore: 0,
+  });
+  assert.equal(result.decision, DECISIONS.WAIT);
+  assert.equal(result.score, null);
+});
+
 test('decision engine rejects high risk even with strong potential', () => {
   const result = evaluateOpportunity({
     demandScore: 95,
