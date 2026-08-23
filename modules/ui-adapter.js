@@ -1,3 +1,5 @@
+import './business-kpi-runtime.js';
+
 /**
  * V4 Sourcing Intelligence — UI Adapter v1
  * Presentation contract only. No scoring, decision, or business-rule calculations.
