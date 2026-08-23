@@ -8,7 +8,7 @@ function send(res, status, body) {
   return res.end(JSON.stringify(body));
 }
 
-function extractionStatus(extracted = {}) {
+export function extractionStatus(extracted = {}) {
   const keys = ['product', 'displayedPrice', 'moq', 'supplier', 'supplierCountry'];
   const present = keys.filter((key) => extracted[key] !== null && extracted[key] !== undefined && String(extracted[key]).trim() !== '').length;
   if (present === 0) return 'EMPTY';
