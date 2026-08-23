@@ -1,4 +1,4 @@
-// V4 Sourcing Intelligence - Radar Scoring Engine v2
+// V4 Sourcing Intelligence - Radar Scoring Engine v3
 // Rule-based scoring only. Confidence is kept separate from potential scoring.
 
 const POTENTIAL_WEIGHTS = Object.freeze({
@@ -14,30 +14,50 @@ const POTENTIAL_WEIGHT_TOTAL = Object.values(POTENTIAL_WEIGHTS).reduce(
 );
 
 export function calculateRadarScore(signals = {}) {
+  const rawSignals = {
+    demand: numericOrUnknown(signals.demand),
+    marketing: numericOrUnknown(signals.marketing),
+    sourcing: numericOrUnknown(signals.sourcing),
+    profitability: numericOrUnknown(signals.profitability),
+  };
+
+  const complete = Object.values(rawSignals).every((value) => value !== null);
+  const confidence = numericOrUnknown(signals.confidence);
+
+  if (!complete) {
+    return {
+      total: null,
+      breakdown: {
+        demand: rawSignals.demand,
+        marketing: rawSignals.marketing,
+        sourcing: rawSignals.sourcing,
+        profitability: rawSignals.profitability,
+        confidence,
+      },
+      status: 'insufficient_data',
+    };
+  }
+
   const potentialRaw =
-    normalize(signals.demand) * POTENTIAL_WEIGHTS.demand / 100 +
-    normalize(signals.marketing) * POTENTIAL_WEIGHTS.marketing / 100 +
-    normalize(signals.sourcing) * POTENTIAL_WEIGHTS.sourcing / 100 +
-    normalize(signals.profitability) * POTENTIAL_WEIGHTS.profitability / 100;
+    rawSignals.demand * POTENTIAL_WEIGHTS.demand / 100 +
+    rawSignals.marketing * POTENTIAL_WEIGHTS.marketing / 100 +
+    rawSignals.sourcing * POTENTIAL_WEIGHTS.sourcing / 100 +
+    rawSignals.profitability * POTENTIAL_WEIGHTS.profitability / 100;
 
   const potential = Math.round((potentialRaw * 100) / POTENTIAL_WEIGHT_TOTAL);
-  const confidence = normalize(signals.confidence);
 
   return {
     total: potential,
     breakdown: {
-      demand: normalize(signals.demand),
-      marketing: normalize(signals.marketing),
-      sourcing: normalize(signals.sourcing),
-      profitability: normalize(signals.profitability),
+      ...rawSignals,
       confidence,
     },
     status: scoreStatus(potential),
   };
 }
 
-function normalize(value) {
-  if (typeof value !== 'number') return 0;
+function numericOrUnknown(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
   return Math.max(0, Math.min(100, value));
 }
 
