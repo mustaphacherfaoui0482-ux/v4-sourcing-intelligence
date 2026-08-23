@@ -45,17 +45,24 @@ function parseJsonLd(html) {
   return values;
 }
 
+function usableTitle(value) {
+  const title = clean(value);
+  if (!title) return null;
+  const generic = /^(alibaba(?:\.com)?|alibaba\.com\s*[-|:–—]|access denied|just a moment|attention required|verify you are human)$/i;
+  return generic.test(title) ? null : title;
+}
+
 export function parseAlibabaProductHtml(html = '') {
   const source = String(html ?? '');
   const jsonLd = parseJsonLd(source);
   const productLd = jsonLd.find((item) => item?.['@type'] === 'Product') || {};
   const offerLd = Array.isArray(productLd.offers) ? productLd.offers[0] : (productLd.offers || {});
 
-  const product = clean(productLd.name) || firstMatch(source, [
+  const product = usableTitle(productLd.name) || usableTitle(firstMatch(source, [
     /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i,
     /<meta[^>]+name=["']title["'][^>]+content=["']([^"']+)/i,
     /<title[^>]*>([\s\S]*?)<\/title>/i,
-  ]);
+  ]));
 
   const displayedPrice = parseNumber(offerLd.price) ?? parseNumber(firstMatch(source, [
     /<meta[^>]+(?:property|name)=["']product:price:amount["'][^>]+content=["']([^"']+)/i,
