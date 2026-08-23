@@ -21,7 +21,7 @@ test('dashboard runtime derives KPI state from canonical V4 engines', () => {
 test('empty opportunity remains empty and does not invent an opportunity', () => {
   const state = calculateDashboardState(EMPTY_OPPORTUNITY);
   assert.equal(state.opportunity.product, 'Aucune opportunité active');
-  assert.equal(state.economics.inputs.landedCost, 0);
+  assert.equal(state.economics.inputs.landedCost, null);
   assert.equal(state.opportunity.evidenceLevel, 'P0');
   assert.equal(state.isDemo, false);
 });
@@ -41,7 +41,7 @@ test('manual sourcing creates a P0 record without inventing scores or evidence',
   const state = calculateDashboardState(opportunity);
   assert.equal(state.opportunity.product, 'Lampe rechargeable');
   assert.equal(state.opportunity.evidenceLevel, 'P0');
-  assert.equal(state.opportunity.score, 0);
+  assert.equal(state.opportunity.score, null);
   assert.equal(state.decision.decision, 'ATTENDRE');
 });
 
