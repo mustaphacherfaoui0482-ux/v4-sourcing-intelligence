@@ -7,13 +7,13 @@ const ACTIVE_KEY = 'v4-sourcing.active-opportunity.v1';
 function normalizeUrl(value) {
   try {
     const url = new URL(String(value || '').trim());
-    if (url.protocol !== 'https:' || !/^(www\.)?alibaba\.com$/i.test(url.hostname)) return null;
+    if (url.protocol !== 'https:' || !/^(www\\.)?alibaba\\.com$/i.test(url.hostname)) return null;
     return url.href;
   } catch { return null; }
 }
 
 function parseDecimal(value) {
-  const raw = String(value ?? '').trim().replace(/\s/g, '').replace(',', '.');
+  const raw = String(value ?? '').trim().replace(/\\s/g, '').replace(',', '.');
   if (!raw) return null;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
@@ -28,7 +28,11 @@ function field(label, key, type = 'text', placeholder = '') {
 function setField(form, key, value) {
   if (value == null || value === '') return;
   const input = form.querySelector(`[data-alibaba-field="${key}"]`);
-  if (input && !String(input.value || '').trim()) input.value = String(value);
+  if (input) input.value = String(value);
+}
+
+function displayValue(value) {
+  return value == null || value === '' ? '—' : String(value);
 }
 
 async function fetchAlibabaData(url) {
@@ -140,7 +144,7 @@ export function renderAlibabaImport(root = document) {
     }
 
     const importLabel = isAutomaticExtraction ? 'Données Alibaba extraites' : 'Données saisies manuellement';
-    output.innerHTML = `<div class="evidence"><span class="pbadge">PAGE : RÉCUPÉRÉE</span><span class="pbadge">EXTRACTION : ${extractedStatus}</span><span class="pbadge">OPPORTUNITY : P1</span><span class="pbadge">SOURCE : ALIBABA.COM</span><span class="pbadge">CONFIDENCE : UNKNOWN</span></div><div class="diagnostic" style="margin-top:10px"><b>${importLabel}</b> · ${evidence.product} · Prix : ${evidence.displayedPrice ?? '—'} · MOQ : ${evidence.moq ?? '—'} · Fournisseur : ${evidence.supplier || '—'}<br><span class="sub">Opportunité P1 enregistrée. Les valeurs économiques manquantes restent inconnues.</span></div>`;
+    output.innerHTML = `<div class="evidence"><span class="pbadge">PAGE : RÉCUPÉRÉE</span><span class="pbadge">EXTRACTION : ${extractedStatus}</span><span class="pbadge">OPPORTUNITY : P1</span><span class="pbadge">SOURCE : ALIBABA.COM</span><span class="pbadge">CONFIDENCE : UNKNOWN</span></div><div class="diagnostic" style="margin-top:10px"><b>${importLabel}</b><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px"><div><b>Produit</b><br>${displayValue(evidence.product)}</div><div><b>Prix affiché</b><br>${displayValue(evidence.displayedPrice)}</div><div><b>MOQ</b><br>${displayValue(evidence.moq)}</div><div><b>Fournisseur</b><br>${displayValue(evidence.supplier)}</div><div><b>Pays fournisseur</b><br>${displayValue(evidence.supplierCountry)}</div><div><b>Preuve</b><br>${displayValue(evidence.evidenceStatus)}</div></div><br><span class="sub">Opportunité P1 enregistrée. Les valeurs économiques manquantes restent inconnues.</span></div>`;
     status.textContent = isAutomaticExtraction ? `Statut : import Alibaba terminé · extraction ${extractedStatus.toLowerCase()} · opportunité V4 P1` : 'Statut : opportunité V4 P1 créée depuis les données saisies';
     document.dispatchEvent(new CustomEvent('v4:alibaba-evidence', { detail: { evidence, opportunity } }));
   });
