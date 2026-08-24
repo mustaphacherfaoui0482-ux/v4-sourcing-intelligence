@@ -80,6 +80,24 @@ test('Reader parser accepts compact Alibaba labels without newlines', () => {
   assert.equal(parsed.supplierCountry, 'China');
 });
 
+test('Reader parser accepts Alibaba labels whose values are on the next line', () => {
+  const parsed = parseAlibabaReaderText(`Product Name\n450GSM Heavyweight Custom Cropped Zip-up Hoodie\nPrice\nUS$ 12.80\nMOQ\n50 Pieces\nSupplier\nExample Factory\nCountry of origin\nChina`);
+  assert.equal(parsed.product, '450GSM Heavyweight Custom Cropped Zip-up Hoodie');
+  assert.equal(parsed.displayedPrice, 12.8);
+  assert.equal(parsed.moq, 50);
+  assert.equal(parsed.supplier, 'Example Factory');
+  assert.equal(parsed.supplierCountry, 'China');
+  assert.equal(parsed.parserStatus, 'PARTIAL_OR_COMPLETE');
+});
+
+test('Reader parser accepts bullet labels whose values are on the next line', () => {
+  const parsed = parseAlibabaReaderText(`- Product Name\n- 450GSM Heavyweight Custom Cropped Zip-up Hoodie\n- Price\n- US$ 12.80\n- MOQ\n- 50 Pieces\n- Supplier\n- Example Factory`);
+  assert.equal(parsed.product, '450GSM Heavyweight Custom Cropped Zip-up Hoodie');
+  assert.equal(parsed.displayedPrice, 12.8);
+  assert.equal(parsed.moq, 50);
+  assert.equal(parsed.supplier, 'Example Factory');
+});
+
 test('Reader parser ignores generic reader headings', () => {
   const parsed = parseAlibabaReaderText('# Alibaba.com\n## Product Details\nNo product data available');
   assert.equal(parsed.product, null);
