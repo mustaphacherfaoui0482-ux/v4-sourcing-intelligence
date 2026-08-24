@@ -14,6 +14,13 @@ const KPI_DEFINITIONS = Object.freeze([
   ['Stock', 'Unités disponibles'],
 ]);
 
+export function formatLandedCostDisplay(value) {
+  if (value === null || value === undefined || value === '') return '—';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  return `${numeric.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`;
+}
+
 export function renderBusinessKPIControlCenter(root = document) {
   if (!root?.querySelector || root.querySelector('[data-v4-business-kpis]')) return;
   const anchor = root.querySelector('.kpis');
@@ -85,9 +92,12 @@ function guardUnknownDashboardValues(root = document) {
     }
   });
 
+  const cards = root.querySelectorAll('.kpis .kpi .val');
+  const landedCost = state.economics?.inputs?.landedCost;
+  if (cards[1]) cards[1].textContent = formatLandedCostDisplay(landedCost);
+
   const maxCac = state.economics?.maxCacAtTargetMargin;
   if (maxCac == null || !Number.isFinite(Number(maxCac))) {
-    const cards = root.querySelectorAll('.kpis .kpi .val');
     if (cards[3]) cards[3].textContent = '—';
   }
 }
