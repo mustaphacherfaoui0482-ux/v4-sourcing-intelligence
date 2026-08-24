@@ -9,7 +9,7 @@ const number = (value) => {
 };
 function labelled(text, labels) {
   for (const label of labels) {
-    const re = new RegExp(`(?:^|\\n|\\|)\\s*(?:${label})\\s*[:：-]\\s*([^\\n|]{1,180})`, 'i');
+    const re = new RegExp(`(?:^|\n|\|)\s*(?:${label})\s*[:：-]\s*([^\n|]{1,180})`, 'i');
     const m = String(text).match(re);
     if (m?.[1]) return clean(m[1]);
   }
@@ -17,8 +17,8 @@ function labelled(text, labels) {
 }
 export function parseAlibabaReaderText(text = '') {
   const source = String(text ?? '');
-  const product = labelled(source, ['Product Name', 'Product title', 'Product', 'Title', 'Nom du produit']) || clean(source.match(/^#\\s+([^\\n]+)/m)?.[1] || '') || null;
-  const displayedPrice = number(labelled(source, ['Price', 'Starting price', 'From', 'Prix', 'Prix de départ'])) ?? number(source.match(/(?:US\\$|USD|\\$|€|EUR)\\s*([0-9]+(?:[.,][0-9]+)?)/i)?.[1]);
+  const product = labelled(source, ['Product Name', 'Product title', 'Product', 'Title', 'Nom du produit']) || clean(source.match(/^#\s+([^\n]+)/m)?.[1] || '') || null;
+  const displayedPrice = number(labelled(source, ['Price', 'Starting price', 'From', 'Prix', 'Prix de départ'])) ?? number(source.match(/(?:US\$|USD|\$|€|EUR)\s*([0-9]+(?:[.,][0-9]+)?)/i)?.[1]);
   const moq = number(labelled(source, ['MOQ', 'Minimum order quantity', 'Minimum order', 'Quantité minimale'])) ?? number(source.match(/(?:MOQ|minimum order quantity|minimum order)[^0-9]{0,80}([0-9]+(?:[.,][0-9]+)?)/i)?.[1]);
   const supplier = labelled(source, ['Supplier', 'Manufacturer', 'Brand', 'Fournisseur', 'Fabricant']);
   const supplierCountry = labelled(source, ['Supplier country', 'Country of supplier', 'Country of origin', 'Pays du fournisseur', 'Pays']);
