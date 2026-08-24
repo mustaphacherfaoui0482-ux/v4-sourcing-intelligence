@@ -25,6 +25,8 @@ const TABLE_LABELS = {
 };
 
 const ALL_TABLE_LABELS = Object.values(TABLE_LABELS).flat().map(normalLabel);
+const ALL_LABELS_SORTED = Object.values(TABLE_LABELS).flat().sort((a, b) => b.length - a.length);
+const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function markdownRows(source) {
   return source.split(/\r?\n/)
@@ -77,11 +79,29 @@ function labelled(text, labels) {
   }
 
   for (const label of labels) {
-    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escaped = escapeRegex(label);
     const re = new RegExp(`(?:^|\\n|\\|)\\s*(?:[-*+]\\s+)?(?:\\*\\*)?(?:${escaped})(?:\\*\\*)?\\s*(?::|：|-|\\|)\\s*(?:\\*\\*)?([^\\n|]{1,180}?)(?:\\*\\*)?\\s*(?=\\n|\\||$)`, 'im');
     const m = source.match(re);
     if (m?.[1]) return clean(m[1]);
   }
+
+  // Some reader responses collapse the whole product block onto one line.
+  // Capture the requested label until the next known V4 label instead of
+  // requiring a newline. This remains evidence-only: no value is invented.
+  const requested = labels.map(normalLabel);
+  for (const label of ALL_LABELS_SORTED) {
+    if (!requested.includes(normalLabel(label))) continue;
+    const escaped = escapeRegex(label);
+    const stopLabels = ALL_LABELS_SORTED
+      .filter((candidate) => normalLabel(candidate) !== normalLabel(label))
+      .map(escapeRegex)
+      .join('|');
+    const stop = stopLabels ? `(?=\\s+(?:${stopLabels})\\s*(?::|：|-|\\|)|\\s*$)` : '(?=\\s*$)';
+    const re = new RegExp(`(?:^|\\s|\\|)(?:${escaped})\\s*(?::|：|-|\\|)\\s*([^\\n|]{1,220}?)${stop}`, 'i');
+    const m = source.match(re);
+    if (m?.[1]) return clean(m[1]);
+  }
+
   return null;
 }
 
