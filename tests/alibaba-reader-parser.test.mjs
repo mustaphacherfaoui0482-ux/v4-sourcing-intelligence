@@ -34,8 +34,17 @@ test('Reader parser accepts common Alibaba min-order and company labels', () => 
   assert.equal(parsed.supplier, 'Example Factory');
 });
 
-test('Reader parser extracts fields from a Markdown table returned by the reader', () => {
+test('Reader parser extracts fields from a vertical Markdown table returned by the reader', () => {
   const parsed = parseAlibabaReaderText(`| Product Name | Portable LED Lamp |\n| --- | --- |\n| Price | US$ 4.80 |\n| MOQ | 100 Pieces |\n| Supplier | Example Factory |\n| Country of origin | China |`);
+  assert.equal(parsed.product, 'Portable LED Lamp');
+  assert.equal(parsed.displayedPrice, 4.8);
+  assert.equal(parsed.moq, 100);
+  assert.equal(parsed.supplier, 'Example Factory');
+  assert.equal(parsed.supplierCountry, 'China');
+});
+
+test('Reader parser extracts fields from a horizontal Alibaba Markdown table', () => {
+  const parsed = parseAlibabaReaderText(`| Product Name | Price | MOQ | Supplier | Country of origin |\n| --- | --- | --- | --- | --- |\n| Portable LED Lamp | US$ 4.80 | 100 Pieces | Example Factory | China |`);
   assert.equal(parsed.product, 'Portable LED Lamp');
   assert.equal(parsed.displayedPrice, 4.8);
   assert.equal(parsed.moq, 100);
