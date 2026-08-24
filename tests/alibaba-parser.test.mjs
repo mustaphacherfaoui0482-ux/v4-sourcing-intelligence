@@ -54,6 +54,22 @@ test('Alibaba parser extracts explicit key values even when the JSON wrapper is 
   assert.equal(parsed.supplier, 'Fallback Factory');
 });
 
+test('Alibaba parser accepts seller/company and alternate MOQ/country keys from dynamic state', () => {
+  const state = JSON.stringify({
+    productTitle: 'Montre à Quartz Pour Homme',
+    price: '9.5',
+    minOrderQty: 1,
+    companyName: 'Foshan jintai zhengyu',
+    countryName: 'China',
+  });
+  const parsed = parseAlibabaProductHtml(`<script>window.runParams = ${state};</script>`);
+  assert.equal(parsed.product, 'Montre à Quartz Pour Homme');
+  assert.equal(parsed.displayedPrice, 9.5);
+  assert.equal(parsed.moq, 1);
+  assert.equal(parsed.supplier, 'Foshan jintai zhengyu');
+  assert.equal(parsed.supplierCountry, 'China');
+});
+
 test('Alibaba parser accepts reversed meta attribute order', () => {
   const html = '<html><head><meta content="Portable Mini Fan" property="og:title"><meta content="4.80" property="product:price:amount"></head></html>';
   const parsed = parseAlibabaProductHtml(html);
