@@ -7,8 +7,8 @@ const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
 
 function decode(value) {
   return clean(String(value ?? '')
-    .replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+    .replace(/&amp;/gi, '&').replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'").replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
     .replace(/\\u([0-9a-f]{4})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/\\"/g, '"'));
 }
@@ -58,10 +58,8 @@ function parseScripts(html) {
     const attrs = match[1] || '';
     const body = match[2]?.trim() || '';
     if (!body || body.length > 2_000_000 || /application\/ld\+json/i.test(attrs)) continue;
-
     const direct = parseJson(body);
     if (direct != null) { values.push(direct); continue; }
-
     for (const match2 of body.matchAll(/(?:=|:)\s*([\[{])/g)) {
       const index = (match2.index ?? 0) + match2[0].lastIndexOf(match2[1]);
       const candidate = parseJson(balancedJson(body, index));
@@ -156,20 +154,47 @@ export function parseAlibabaProductHtml(html = '') {
       /(?:US\$|USD|\$)\s*([0-9]+(?:[.,][0-9]+)?)/i,
     ]));
 
+  // Alibaba uses several different seller/company keys depending on the page
+  // template. Keep the extraction explicit: these are source fields, not
+  // inferred identities.
   const supplier = clean(productLd.brand?.name || productLd.manufacturer?.name)
-    || clean(objectValue(objects, ['supplierName', 'supplier', 'manufacturer', 'brandName', 'brand']))
-    || clean(rawKeyValue(source, ['supplierName', 'supplier', 'manufacturer', 'brandName', 'brand']));
+    || clean(objectValue(objects, [
+      'supplierName', 'supplier', 'supplierCompanyName', 'companyName', 'company',
+      'sellerName', 'seller', 'storeName', 'manufacturer', 'brandName', 'brand',
+    ]))
+    || clean(rawKeyValue(source, [
+      'supplierName', 'supplier', 'supplierCompanyName', 'companyName', 'company',
+      'sellerName', 'seller', 'storeName', 'manufacturer', 'brandName', 'brand',
+    ]));
 
-  const country = clean(objectValue(objects, ['supplierCountry', 'supplierCountryName', 'countryOfOrigin', 'country']))
-    || clean(rawKeyValue(source, ['supplierCountry', 'supplierCountryName', 'countryOfOrigin', 'country']));
+  const country = clean(objectValue(objects, [
+    'supplierCountry', 'supplierCountryName', 'countryOfSupplier', 'countryOfOrigin',
+    'countryName', 'country',
+  ]))
+    || clean(rawKeyValue(source, [
+      'supplierCountry', 'supplierCountryName', 'countryOfSupplier', 'countryOfOrigin',
+      'countryName', 'country',
+    ]));
 
-  const moq = number(objectValue(objects, ['minOrderQuantity', 'minimumOrderQuantity', 'moq', 'minimumOrder']))
-    ?? number(rawKeyValue(source, ['minOrderQuantity', 'minimumOrderQuantity', 'moq', 'minimumOrder']))
-    ?? number(first(source, [/(?:minimum order quantity|minimum order|MOQ)[^0-9]{0,80}([0-9]+(?:[.,][0-9]+)?)/i]));
+  const moq = number(objectValue(objects, [
+    'minOrderQuantity', 'minimumOrderQuantity', 'minimumOrderQty', 'minOrderQty',
+    'moq', 'minimumOrder', 'minOrder',
+  ]))
+    ?? number(rawKeyValue(source, [
+      'minOrderQuantity', 'minimumOrderQuantity', 'minimumOrderQty', 'minOrderQty',
+      'moq', 'minimumOrder', 'minOrder',
+    ]))
+    ?? number(first(source, [/(?:minimum order quantity|minimum order|MOQ|min\.?\s*order)[^0-9]{0,80}([0-9]+(?:[.,][0-9]+)?)/i]));
 
   const hasAny = Boolean(product || supplier || country || displayedPrice != null || moq != null);
-  return Object.freeze({ product: product || null, displayedPrice, moq, supplier: supplier || null,
-    supplierCountry: country || null, parserStatus: hasAny ? 'PARTIAL_OR_COMPLETE' : 'NO_STRUCTURED_DATA' });
+  return Object.freeze({
+    product: product || null,
+    displayedPrice,
+    moq,
+    supplier: supplier || null,
+    supplierCountry: country || null,
+    parserStatus: hasAny ? 'PARTIAL_OR_COMPLETE' : 'NO_STRUCTURED_DATA',
+  });
 }
 
 export function isAlibabaHostname(hostname) {
