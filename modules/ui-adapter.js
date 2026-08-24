@@ -5,27 +5,32 @@ import './business-kpi-runtime.js';
  * Presentation contract only. No scoring, decision, or business-rule calculations.
  */
 
+const isMissing = (value) => value === null || value === undefined || value === '';
+
 const formatNumber = (value, decimals = 0) => {
-  if (!Number.isFinite(Number(value))) return '—';
-  return Number(value).toLocaleString('fr-FR', {
+  if (isMissing(value)) return '—';
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return '—';
+  return numeric.toLocaleString('fr-FR', {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
 };
 
 const formatPercent = (value) => {
-  if (!Number.isFinite(Number(value))) return '—';
+  if (isMissing(value)) return '—';
   return `${formatNumber(value, 1)} %`;
 };
 
 const formatEuro = (value) => {
-  if (!Number.isFinite(Number(value))) return '—';
+  if (isMissing(value)) return '—';
   return `${formatNumber(value, 2)} €`;
 };
 
 /**
  * Converts a canonical Opportunity into display-ready values.
  * It deliberately does not calculate or reinterpret business metrics.
+ * UNKNOWN/NULL remains unknown; it is never coerced to zero by presentation formatting.
  */
 export function toOpportunityViewModel(opportunity = {}) {
   const dimensions = opportunity.dimensions ?? {};
