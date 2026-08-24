@@ -21,7 +21,7 @@ const TABLE_LABELS = {
   price: ['Price', 'Price Range', 'Starting price', 'From', 'Unit Price', 'Prix', 'Prix de départ'],
   moq: ['MOQ', 'Min. Order Quantity', 'Min Order Quantity', 'Minimum order quantity', 'Minimum order', 'Min. Order', 'Min Order', 'Quantité minimale'],
   supplier: ['Supplier', 'Supplier Name', 'Verified Supplier', 'Company Name', 'Seller', 'Store Name', 'Manufacturer', 'Brand', 'Fournisseur', 'Fabricant'],
-  country: ['Supplier country', 'Country of supplier', 'Country of origin', 'Supplier Country', 'Pays du fournisseur', 'Pays'],
+  country: ['Supplier country', 'Country of supplier', 'Country of origin', 'Supplier Country', 'Country', 'Pays du fournisseur', 'Pays'],
 };
 
 const ALL_TABLE_LABELS = Object.values(TABLE_LABELS).flat().map(normalLabel);
@@ -62,6 +62,11 @@ function tableValue(source, labels) {
 }
 
 function compactLabelled(source, labels) {
+  // Compact parsing is only for genuinely single-line reader output. Multiline
+  // input must use the line-aware parser so a product value cannot absorb the
+  // next line (for example a price-only line).
+  if (/\r?\n/.test(source)) return null;
+
   const allLabels = ALL_LABELS_SORTED.map(escapeRegex).join('|');
   if (!allLabels) return null;
 
@@ -82,9 +87,6 @@ function labelled(text, labels) {
   const fromTable = tableValue(source, labels);
   if (fromTable) return fromTable;
 
-  // Reader sometimes collapses the whole Alibaba block to one line. Parse this
-  // representation before the generic line parser so Product cannot swallow
-  // the following Price/MOQ/Supplier labels.
   const compact = compactLabelled(source, labels);
   if (compact) return compact;
 
