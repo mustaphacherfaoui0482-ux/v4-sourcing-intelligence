@@ -30,7 +30,8 @@ function readerCandidates(normalized) {
   const candidates = [normalized];
   try {
     const url = new URL(normalized);
-    if (/\.alibaba\.com$/i.test(url.hostname) && url.hostname !== 'www.alibaba.com') {
+    const host = url.hostname.toLowerCase();
+    if (host.endsWith('.alibaba.com') && host !== 'www.alibaba.com') {
       const global = new URL(url.href);
       global.hostname = 'www.alibaba.com';
       candidates.push(global.href);
@@ -38,7 +39,7 @@ function readerCandidates(normalized) {
     const http = new URL(normalized);
     http.protocol = 'http:';
     candidates.push(http.href);
-    if (/\.alibaba\.com$/i.test(url.hostname) && url.hostname !== 'www.alibaba.com') {
+    if (host.endsWith('.alibaba.com') && host !== 'www.alibaba.com') {
       const globalHttp = new URL(url.href);
       globalHttp.hostname = 'www.alibaba.com';
       globalHttp.protocol = 'http:';
@@ -91,16 +92,18 @@ export async function fetchAlibabaThroughReader(url) {
   const normalized = normalizeAlibabaUrl(url);
   if (!normalized || !isAlibabaHostname(new URL(normalized).hostname)) throw new Error('invalid_alibaba_url');
   const errors = [];
-  for (const candidate of readerCandidates(normalized)) {
-    try {
-      return await fetchReaderGet(candidate);
-    } catch (error) {
-      errors.push(`get:${candidate}:${error instanceof Error ? error.message : 'failed'}`);
-    }
-    try {
-      return await fetchReaderPost(candidate);
-    } catch (error) {
-      errors.push(`post:${candidate}:${error instanceof Error ? error.message : 'failed'}`);
+  const candidates = readerCandidates(normalized);
+  const preferPost = Boolean(process.env.JINA_API_KEY);
+
+  for (const candidate of candidates) {
+    const methods = preferPost ? [fetchReaderPost, fetchReaderGet] : [fetchReaderGet, fetchReaderPost];
+    for (const method of methods) {
+      try {
+        const result = await method(candidate);
+        return { ...result, readerMode: process.env.JINA_API_KEY ? 'AUTHENTICATED_BROWSER_PROXY' : 'ANONYMOUS_READER' };
+      } catch (error) {
+        errors.push(`${method === fetchReaderPost ? 'post' : 'get'}:${candidate}:${error instanceof Error ? error.message : 'failed'}`);
+      }
     }
   }
   throw new Error(`reader_all_candidates_failed:${errors.join(';')}`);
