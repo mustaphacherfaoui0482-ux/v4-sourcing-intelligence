@@ -23,11 +23,14 @@ function diagnostics(fetched) {
   const text = String(fetched.html || '');
   return {
     acquisition: fetched.acquisition || 'DIRECT',
+    acquisitionUrl: fetched.acquisitionUrl || fetched.url || null,
     responseBytes: Buffer.byteLength(text, 'utf8'),
     parserStatus: fetched.extracted?.parserStatus || 'UNKNOWN',
     hasAlibabaMarker: /alibaba/i.test(text),
     hasProductMarker: /product|产品|商品/i.test(text),
     hasPriceMarker: /price|prix|US\$|USD|EUR|€|\$/i.test(text),
+    hasMoqMarker: /MOQ|minimum order|minimum quantity|最小起订量/i.test(text),
+    hasSupplierMarker: /supplier|manufacturer|seller|factory|供应商|制造商/i.test(text),
   };
 }
 
@@ -75,6 +78,7 @@ export default async function handler(req, res) {
 
   let fetched = null;
   let directError = null;
+  let readerDiagnostics = null;
   try {
     fetched = parseFetchedPage(await fetchAlibabaPage(url));
   } catch (error) {
@@ -83,19 +87,16 @@ export default async function handler(req, res) {
 
   if (!fetched || extractionStatus(fetched.extracted) === 'EMPTY') {
     try {
-      // If Alibaba resolved the short URL, give Reader the resolved product URL.
-      // This avoids asking Reader to interpret the original /x/... redirect itself.
       const readerUrl = fetched?.url || url;
       const readerFetched = await fetchAlibabaThroughReader(readerUrl);
       const parsedReader = parseFetchedPage(readerFetched);
+      readerDiagnostics = diagnostics(parsedReader);
       if (extractionStatus(parsedReader.extracted) !== 'EMPTY' || !fetched) fetched = parsedReader;
-      if (extractionStatus(parsedReader.extracted) === 'EMPTY' && fetched && fetched.acquisition !== 'JINA_READER') {
-        fetched = { ...fetched, readerDiagnostics: diagnostics(parsedReader) };
-      }
     } catch (error) {
+      readerDiagnostics = { error: error instanceof Error ? error.message : 'alibaba_reader_failed' };
       if (!fetched) return send(res, 200, {
         ok: false, source: 'Alibaba.com', sourceUrl: url,
-        error: error instanceof Error ? error.message : directError || 'alibaba_fetch_failed', directError,
+        error: directError || readerDiagnostics.error, directError, readerDiagnostics,
         extracted: { product: null, displayedPrice: null, moq: null, supplier: null, supplierCountry: null },
         fetchStatus: 'fetch_failed', extractionStatus: 'EMPTY', evidenceStatus: 'UNKNOWN',
       });
@@ -109,6 +110,6 @@ export default async function handler(req, res) {
     extracted: fetched.extracted, fetchStatus: 'page_retrieved', extractionStatus: status,
     evidenceStatus: status === 'EMPTY' ? 'INSUFFICIENT' : status === 'COMPLETE' ? 'EXTRACTED' : 'PARTIAL',
     directError,
-    ...(fetched.readerDiagnostics ? { readerDiagnostics: fetched.readerDiagnostics } : {}),
+    readerDiagnostics: readerDiagnostics || diagnostics(fetched),
   });
 }
