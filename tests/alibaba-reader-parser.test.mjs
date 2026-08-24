@@ -34,6 +34,15 @@ test('Reader parser accepts common Alibaba min-order and company labels', () => 
   assert.equal(parsed.supplier, 'Example Factory');
 });
 
+test('Reader parser accepts alternate seller, factory and MOQ labels', () => {
+  const parsed = parseAlibabaReaderText('Product: Montre à Quartz Pour Homme\nPrice: 9.5\nMin order qty: 1\nFactory: Foshan jintai zhengyu\nCountry name: China');
+  assert.equal(parsed.product, 'Montre à Quartz Pour Homme');
+  assert.equal(parsed.displayedPrice, 9.5);
+  assert.equal(parsed.moq, 1);
+  assert.equal(parsed.supplier, 'Foshan jintai zhengyu');
+  assert.equal(parsed.supplierCountry, 'China');
+});
+
 test('Reader parser extracts fields from a vertical Markdown table returned by the reader', () => {
   const parsed = parseAlibabaReaderText(`| Product Name | Portable LED Lamp |\n| --- | --- |\n| Price | US$ 4.80 |\n| MOQ | 100 Pieces |\n| Supplier | Example Factory |\n| Country of origin | China |`);
   assert.equal(parsed.product, 'Portable LED Lamp');
