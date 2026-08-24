@@ -5,10 +5,18 @@ function send(res, status, body) {
   return res.end(JSON.stringify(body));
 }
 
+function getApiKey() {
+  const raw = process.env.PILOTERR_API_KEY || '';
+  // Environment editors can accidentally preserve newlines or duplicate the key.
+  // An API key itself cannot contain whitespace, so use the first non-empty token.
+  return raw.trim().split(/\s+/)[0] || null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') return send(res, 405, { ok: false, error: 'method_not_allowed' });
 
-  const key = process.env.PILOTERR_API_KEY;
+  const rawKey = process.env.PILOTERR_API_KEY || '';
+  const key = getApiKey();
   if (!key) return send(res, 200, {
     ok: false,
     configured: false,
@@ -31,6 +39,8 @@ export default async function handler(req, res) {
       configured: true,
       status: response.ok ? 'AUTHENTICATED' : 'AUTH_ERROR',
       piloterrStatus: response.status,
+      normalizedKey: true,
+      malformedEnvironmentValue: /\s/.test(rawKey.trim()) || rawKey.trim().split(/\s+/).length > 1,
       remaining: payload?.remaining ?? null,
       keyActive: payload?.api_key?.active ?? null,
       keyCategory: payload?.api_key?.category ?? null,
@@ -43,6 +53,8 @@ export default async function handler(req, res) {
       configured: true,
       status: 'NETWORK_ERROR',
       piloterrStatus: null,
+      normalizedKey: true,
+      malformedEnvironmentValue: /\s/.test(rawKey.trim()) || rawKey.trim().split(/\s+/).length > 1,
       error: error instanceof Error ? error.message : 'piloterr_request_failed',
     });
   }
