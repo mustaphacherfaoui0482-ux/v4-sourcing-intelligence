@@ -52,6 +52,25 @@ test('Reader parser extracts fields from a horizontal Alibaba Markdown table', (
   assert.equal(parsed.supplierCountry, 'China');
 });
 
+test('Reader parser accepts single-line labelled product blocks', () => {
+  const parsed = parseAlibabaReaderText('Product Name: Portable LED Lamp Price: US$ 4.80 MOQ: 100 Pieces Supplier: Example Factory Country of origin: China');
+  assert.equal(parsed.product, 'Portable LED Lamp');
+  assert.equal(parsed.displayedPrice, 4.8);
+  assert.equal(parsed.moq, 100);
+  assert.equal(parsed.supplier, 'Example Factory');
+  assert.equal(parsed.supplierCountry, 'China');
+  assert.equal(parsed.parserStatus, 'PARTIAL_OR_COMPLETE');
+});
+
+test('Reader parser accepts compact Alibaba labels without newlines', () => {
+  const parsed = parseAlibabaReaderText('Product: Montre à Quartz Pour Homme Price: 9.5 MOQ: 1 Supplier: Foshan jintai zhengyu Country: China');
+  assert.equal(parsed.product, 'Montre à Quartz Pour Homme');
+  assert.equal(parsed.displayedPrice, 9.5);
+  assert.equal(parsed.moq, 1);
+  assert.equal(parsed.supplier, 'Foshan jintai zhengyu');
+  assert.equal(parsed.supplierCountry, 'China');
+});
+
 test('Reader parser ignores generic reader headings', () => {
   const parsed = parseAlibabaReaderText('# Alibaba.com\n## Product Details\nNo product data available');
   assert.equal(parsed.product, null);
