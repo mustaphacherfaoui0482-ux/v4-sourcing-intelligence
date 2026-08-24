@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -27,40 +27,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
-      - name: Apply UNKNOWN-vs-zero fix on main
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('modules/dashboard-runtime.js')
-          s = p.read_text()
-          s = s.replace("offer:{salePrice:0,landedCost:0,variableFees:0,cac:0,targetMargin:30,visitors:0,conversionRate:0},", "offer:{salePrice:null,landedCost:null,variableFees:null,cac:null,targetMargin:30,visitors:null,conversionRate:null},")
-          s = s.replace("demandScore:0,sourcingScore:0,profitabilityScore:0,riskScore:0,confidence:0,", "demandScore:null,sourcingScore:null,profitabilityScore:null,riskScore:null,confidence:null,")
-          s = s.replace("marketingScore:0,easeOfTest:0,availability:0,potential:0,landedCostScore:0,", "marketingScore:null,easeOfTest:null,availability:null,potential:null,landedCostScore:null,")
-          s = s.replace("const money=v=>`${Number(v).toFixed(2).replace('.',',')} €`;", "const money=v=>{if(v===null||v===undefined||v==='')return '—';const n=Number(v);return Number.isFinite(n)?`${n.toFixed(2).replace('.',',')} €`:'—'};")
-          s = s.replace("const n=Math.max(0,Math.min(100,Number(score)||0));node.style.background=`conic-gradient(var(--green,#79df31) 0 ${n*3.6}deg,#24302d ${n*3.6}deg)`;setText(node.querySelector('b'),String(Math.round(n)))", "const n=Number(score);if(!Number.isFinite(n)){node.style.background='conic-gradient(#24302d 0 360deg)';setText(node.querySelector('b'),'—');return}const clamped=Math.max(0,Math.min(100,n));node.style.background=`conic-gradient(var(--green,#79df31) 0 ${clamped*3.6}deg,#24302d ${clamped*3.6}deg)`;setText(node.querySelector('b'),String(Math.round(clamped)))")
-          s = s.replace("`${state.opportunity.dimensions.potential??0}/100`", "`${state.opportunity.dimensions.potential==null?'UNKNOWN':state.opportunity.dimensions.potential}/100`")
-          s = s.replace("`${state.opportunity.dimensions.demand??0}/100`", "`${state.opportunity.dimensions.demand==null?'UNKNOWN':state.opportunity.dimensions.demand}/100`")
-          s = s.replace("`${state.opportunity.dimensions.margin??0}%`", "`${state.opportunity.dimensions.margin==null?'UNKNOWN':state.opportunity.dimensions.margin}%`")
-          s = s.replace("`${state.opportunity.dimensions.risk??0}/100`", "`${state.opportunity.dimensions.risk==null?'UNKNOWN':state.opportunity.dimensions.risk}/100`")
-          s = s.replace("return value}catch{return null}", "if(value.source==='À renseigner'){value.offer={...value.offer,salePrice:value.offer.salePrice===0?null:value.offer.salePrice,landedCost:value.offer.landedCost===0?null:value.offer.landedCost,variableFees:value.offer.variableFees===0?null:value.offer.variableFees,cac:value.offer.cac===0?null:value.offer.cac,visitors:value.offer.visitors===0?null:value.offer.visitors,conversionRate:value.offer.conversionRate===0?null:value.offer.conversionRate};for(const key of ['demandScore','sourcingScore','profitabilityScore','riskScore','confidence','marketingScore','easeOfTest','availability','potential','landedCostScore'])if(value[key]===0)value[key]=null}return value}catch{return null}")
-          p.write_text(s)
-
-          p = Path('tests/dashboard-runtime.test.mjs')
-          s = p.read_text()
-          s = s.replace("assert.equal(state.economics.inputs.landedCost, 0);", "assert.equal(state.economics.inputs.landedCost, null);")
-          s = s.replace("assert.equal(state.opportunity.score, 0);", "assert.equal(state.opportunity.score, null);")
-          p.write_text(s)
-          PY
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add modules/dashboard-runtime.js tests/dashboard-runtime.test.mjs
-          if git diff --cached --quiet; then echo "UNKNOWN-vs-zero fix already applied"; exit 0; fi
-          git commit -m "fix: migrate legacy zero-valued manual sourcing state"
-          git push
+      - name: Install dependencies
+        run: npm ci
 
       - name: Run tests
         run: npm test
@@ -73,11 +43,17 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout main
+      - name: Checkout exact tested commit
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
 
       - name: Verify exact release payload
         shell: bash
