@@ -17,8 +17,7 @@ export async function fetchAlibabaThroughReader(url) {
     redirect: 'follow',
     signal: AbortSignal.timeout(TIMEOUT_MS),
     headers: {
-      accept: 'text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8',
-      'x-respond-with': 'html',
+      accept: 'text/plain,text/markdown;q=0.9,*/*;q=0.8',
       'x-timeout': '15',
       'user-agent': 'V4-Sourcing-Intelligence/1.0',
     },
@@ -34,6 +33,6 @@ export async function fetchAlibabaThroughReader(url) {
     html: text,
     acquisition: 'JINA_READER',
     acquisitionUrl: proxyUrl,
-    contentType,
+    contentType: contentType || 'text/plain',
   };
 }
