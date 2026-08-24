@@ -41,7 +41,6 @@ export async function fetchAlibabaThroughPiloterr(url) {
     signal: AbortSignal.timeout(TIMEOUT_MS),
     headers: {
       accept: 'application/json',
-      authorization: `Bearer ${process.env.PILOTERR_API_KEY}`,
       'x-api-key': process.env.PILOTERR_API_KEY,
     },
   });
@@ -55,7 +54,7 @@ export async function fetchAlibabaThroughPiloterr(url) {
     html: JSON.stringify(payload),
     contentType: 'application/json',
     acquisition: 'PILOTERR_BROWSER_API',
-    acquisitionUrl: endpoint.split('?')[0],
+    acquisitionUrl: ENDPOINT,
     targetUrl: url,
     extracted,
   };
