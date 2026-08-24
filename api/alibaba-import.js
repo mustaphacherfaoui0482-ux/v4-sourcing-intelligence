@@ -4,6 +4,7 @@ import { fetchAlibabaThroughReader } from './alibaba-reader-fallback.js';
 
 const MAX_BYTES = 2_000_000;
 const TIMEOUT_MS = 8_000;
+const EXTRACTION_KEYS = ['product', 'displayedPrice', 'moq', 'supplier', 'supplierCountry'];
 
 function send(res, status, body) {
   res.status(status).setHeader('content-type', 'application/json; charset=utf-8');
@@ -11,11 +12,25 @@ function send(res, status, body) {
 }
 
 export function extractionStatus(extracted = {}) {
-  const keys = ['product', 'displayedPrice', 'moq', 'supplier', 'supplierCountry'];
-  const present = keys.filter((key) => extracted[key] !== null && extracted[key] !== undefined && String(extracted[key]).trim() !== '').length;
+  const present = EXTRACTION_KEYS.filter((key) => extracted[key] !== null && extracted[key] !== undefined && String(extracted[key]).trim() !== '').length;
   if (present === 0) return 'EMPTY';
-  if (present === keys.length) return 'COMPLETE';
+  if (present === EXTRACTION_KEYS.length) return 'COMPLETE';
   return 'PARTIAL';
+}
+
+export function mergeAlibabaExtraction(primary = {}, secondary = {}) {
+  const merged = {};
+  for (const key of EXTRACTION_KEYS) {
+    const primaryValue = primary[key];
+    const secondaryValue = secondary[key];
+    const primaryPresent = primaryValue !== null && primaryValue !== undefined && String(primaryValue).trim() !== '';
+    const secondaryPresent = secondaryValue !== null && secondaryValue !== undefined && String(secondaryValue).trim() !== '';
+    merged[key] = primaryPresent ? primaryValue : secondaryPresent ? secondaryValue : null;
+  }
+  return Object.freeze({
+    ...merged,
+    parserStatus: extractionStatus(merged) === 'EMPTY' ? 'NO_STRUCTURED_DATA' : 'PARTIAL_OR_COMPLETE',
+  });
 }
 
 function diagnostics(fetched) {
@@ -79,19 +94,42 @@ export default async function handler(req, res) {
   let fetched = null;
   let directError = null;
   let readerDiagnostics = null;
+  let readerUsed = false;
   try {
     fetched = parseFetchedPage(await fetchAlibabaPage(url));
   } catch (error) {
     directError = error instanceof Error ? error.message : 'alibaba_fetch_failed';
   }
 
-  if (!fetched || extractionStatus(fetched.extracted) === 'EMPTY') {
+  // PARTIAL direct extraction must also try the reader: missing fields can be present
+  // in the alternate representation. Merge only missing fields; never overwrite a
+  // value already extracted from the direct page.
+  if (!fetched || extractionStatus(fetched.extracted) !== 'COMPLETE') {
     try {
       const readerUrl = fetched?.url || url;
       const readerFetched = await fetchAlibabaThroughReader(readerUrl);
       const parsedReader = parseFetchedPage(readerFetched);
       readerDiagnostics = diagnostics(parsedReader);
-      if (extractionStatus(parsedReader.extracted) !== 'EMPTY' || !fetched) fetched = parsedReader;
+      const before = extractionStatus(fetched?.extracted || {});
+      const merged = mergeAlibabaExtraction(fetched?.extracted || {}, parsedReader.extracted || {});
+      const after = extractionStatus(merged);
+
+      if (!fetched) {
+        fetched = {
+          ...parsedReader,
+          url: parsedReader.url || url,
+          acquisition: 'JINA_READER',
+          extracted: merged,
+        };
+        readerUsed = true;
+      } else {
+        fetched = {
+          ...fetched,
+          acquisition: after !== before ? 'DIRECT+JINA_READER' : fetched.acquisition,
+          extracted: merged,
+        };
+        readerUsed = after !== before;
+      }
     } catch (error) {
       readerDiagnostics = { error: error instanceof Error ? error.message : 'alibaba_reader_failed' };
       if (!fetched) return send(res, 200, {
@@ -106,8 +144,11 @@ export default async function handler(req, res) {
   const status = extractionStatus(fetched.extracted);
   return send(res, 200, {
     ok: true, source: 'Alibaba.com', sourceUrl: url,
-    acquisition: fetched.acquisition || 'DIRECT', acquisitionUrl: fetched.acquisitionUrl || url,
-    extracted: fetched.extracted, fetchStatus: 'page_retrieved', extractionStatus: status,
+    acquisition: fetched.acquisition || (readerUsed ? 'DIRECT+JINA_READER' : 'DIRECT'),
+    acquisitionUrl: fetched.acquisitionUrl || url,
+    extracted: fetched.extracted,
+    fetchStatus: 'page_retrieved',
+    extractionStatus: status,
     evidenceStatus: status === 'EMPTY' ? 'INSUFFICIENT' : status === 'COMPLETE' ? 'EXTRACTED' : 'PARTIAL',
     directError,
     readerDiagnostics: readerDiagnostics || diagnostics(fetched),
