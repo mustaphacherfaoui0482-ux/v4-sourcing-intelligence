@@ -36,14 +36,8 @@ function tableValue(source, labels) {
   const wanted = labels.map(normalLabel);
   const rows = markdownRows(source);
 
-  // Vertical key/value table: | Product | value |
-  for (const row of rows) {
-    for (let i = 0; i < row.length - 1; i += 1) {
-      if (wanted.includes(normalLabel(row[i]))) return clean(row[i + 1]);
-    }
-  }
-
   // Horizontal table: | Product | Price | MOQ | Supplier |\n| title | $4 | 10 | Factory |
+  // Evaluate this before key/value rows so the header is never mistaken for a value.
   for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
     const header = rows[rowIndex];
     const headerIndexes = wanted.map((label) => header.findIndex((cell) => normalLabel(cell) === label));
@@ -54,6 +48,12 @@ function tableValue(source, labels) {
       const index = headerIndexes.find((candidate) => candidate >= 0);
       if (index != null && values[index] != null) return clean(values[index]);
     }
+  }
+
+  // Vertical key/value table: | Product | value |
+  for (const row of rows) {
+    if (row.length !== 2) continue;
+    if (wanted.includes(normalLabel(row[0]))) return clean(row[1]);
   }
 
   return null;
@@ -94,15 +94,8 @@ function headingProduct(source) {
 }
 
 function looseProduct(source) {
-  const patterns = [
-    /(?:^|\n)\s*(?:Product(?: Name| Title)?|Item(?: Name)?|Nom du produit)\s*[:：-]\s*([^\n|]{4,220})/im,
-    /(?:^|\n)\s*\[[^\]]{8,220}\]\((?:https?:\/\/)?(?:www\.)?alibaba\.com[^)]*\)/im,
-  ];
-  for (const pattern of patterns) {
-    const match = source.match(pattern);
-    if (match?.[1]) return clean(match[1]);
-  }
-  return null;
+  const match = source.match(/(?:^|\n)\s*(?:Product(?: Name| Title)?|Item(?: Name)?|Nom du produit)\s*[:：-]\s*([^\n|]{4,220})/im);
+  return match?.[1] ? clean(match[1]) : null;
 }
 
 export function parseAlibabaReaderText(text = '') {
