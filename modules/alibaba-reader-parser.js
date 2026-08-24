@@ -14,7 +14,7 @@ const number = (value) => {
   return Number.isFinite(n) ? n : null;
 };
 
-const normalLabel = (value) => clean(value).replace(/[：:|]/g, '').trim().toLowerCase();
+const normalLabel = (value) => clean(value).replace(/[：:|]/g, '').replace(/^[-*+]\s+/, '').trim().toLowerCase();
 
 const TABLE_LABELS = {
   product: ['Product Name', 'Product title', 'Product', 'Title', 'Item Name', 'Nom du produit'],
@@ -62,9 +62,6 @@ function tableValue(source, labels) {
 }
 
 function compactLabelled(source, labels) {
-  // Compact parsing is only for genuinely single-line reader output. Multiline
-  // input must use the line-aware parser so a product value cannot absorb the
-  // next line (for example a price-only line).
   if (/\r?\n/.test(source)) return null;
 
   const allLabels = ALL_LABELS_SORTED.map(escapeRegex).join('|');
@@ -82,10 +79,44 @@ function compactLabelled(source, labels) {
   return null;
 }
 
+function nextNonEmptyLine(lines, index) {
+  for (let i = index + 1; i < lines.length; i += 1) {
+    const value = lines[i].trim();
+    if (!value) continue;
+    if (/^(?:#{1,6}\s+|[-*+]\s*$)/.test(value)) return null;
+    return value;
+  }
+  return null;
+}
+
+function splitLineLabelled(source, labels) {
+  const wanted = labels.map(normalLabel);
+  const lines = source.split(/\r?\n/);
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const raw = lines[i].trim();
+    if (!raw) continue;
+
+    const cells = raw.split('|').map(clean).filter(Boolean);
+    if (cells.length >= 2 && wanted.includes(normalLabel(cells[0]))) return clean(cells.slice(1).join(' '));
+
+    const withoutMarker = raw.replace(/^[-*+]\s+/, '').trim();
+    if (!wanted.includes(normalLabel(withoutMarker))) continue;
+
+    const value = nextNonEmptyLine(lines, i);
+    if (value) return clean(value.replace(/^[-*+]\s+/, ''));
+  }
+
+  return null;
+}
+
 function labelled(text, labels) {
   const source = String(text);
   const fromTable = tableValue(source, labels);
   if (fromTable) return fromTable;
+
+  const splitLine = splitLineLabelled(source, labels);
+  if (splitLine) return splitLine;
 
   const compact = compactLabelled(source, labels);
   if (compact) return compact;
