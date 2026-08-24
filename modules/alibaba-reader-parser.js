@@ -2,6 +2,7 @@
 const clean = (value) => String(value ?? '')
   .replace(/\*\*/g, '')
   .replace(/`/g, '')
+  .replace(/\[[^\]]+\]\([^)]*\)/g, (match) => match.replace(/\]\([^)]*\)/, '').replace(/^\[/, ''))
   .replace(/\s+/g, ' ')
   .trim();
 
@@ -15,12 +16,55 @@ const number = (value) => {
 
 const normalLabel = (value) => clean(value).replace(/[：:|]/g, '').trim().toLowerCase();
 
+const TABLE_LABELS = {
+  product: ['Product Name', 'Product title', 'Product', 'Title', 'Item Name', 'Nom du produit'],
+  price: ['Price', 'Price Range', 'Starting price', 'From', 'Unit Price', 'Prix', 'Prix de départ'],
+  moq: ['MOQ', 'Min. Order Quantity', 'Min Order Quantity', 'Minimum order quantity', 'Minimum order', 'Min. Order', 'Min Order', 'Quantité minimale'],
+  supplier: ['Supplier', 'Supplier Name', 'Verified Supplier', 'Company Name', 'Seller', 'Store Name', 'Manufacturer', 'Brand', 'Fournisseur', 'Fabricant'],
+  country: ['Supplier country', 'Country of supplier', 'Country of origin', 'Supplier Country', 'Pays du fournisseur', 'Pays'],
+};
+
+function markdownRows(source) {
+  return source.split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.includes('|'))
+    .map((line) => line.split('|').map(clean).filter((cell) => cell !== ''))
+    .filter((cells) => cells.length >= 2 && !cells.every((cell) => /^[-: ]+$/.test(cell)));
+}
+
+function tableValue(source, labels) {
+  const wanted = labels.map(normalLabel);
+  const rows = markdownRows(source);
+
+  // Vertical key/value table: | Product | value |
+  for (const row of rows) {
+    for (let i = 0; i < row.length - 1; i += 1) {
+      if (wanted.includes(normalLabel(row[i]))) return clean(row[i + 1]);
+    }
+  }
+
+  // Horizontal table: | Product | Price | MOQ | Supplier |\n| title | $4 | 10 | Factory |
+  for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
+    const header = rows[rowIndex];
+    const headerIndexes = wanted.map((label) => header.findIndex((cell) => normalLabel(cell) === label));
+    if (!headerIndexes.some((index) => index >= 0)) continue;
+    for (let valueIndex = rowIndex + 1; valueIndex < rows.length; valueIndex += 1) {
+      const values = rows[valueIndex];
+      if (values.length < header.length) continue;
+      const index = headerIndexes.find((candidate) => candidate >= 0);
+      if (index != null && values[index] != null) return clean(values[index]);
+    }
+  }
+
+  return null;
+}
+
 function labelled(text, labels) {
   const source = String(text);
+  const fromTable = tableValue(source, labels);
+  if (fromTable) return fromTable;
   const wanted = labels.map(normalLabel);
 
-  // Jina/reader output frequently uses Markdown tables. In that format the
-  // label and value are separate cells, so a line-oriented regex is insufficient.
   for (const line of source.split(/\r?\n/)) {
     const cells = line.split('|').map(clean).filter(Boolean);
     if (cells.length < 2 || /^[-: ]+$/.test(cells.join(''))) continue;
@@ -42,49 +86,41 @@ function headingProduct(source) {
   for (const match of source.matchAll(/^#{1,6}\s+([^\n]+)/gm)) {
     const value = clean(match[1]);
     if (!value) continue;
-    if (/^(?:alibaba(?:\.com)?|product details?|specifications?|overview|description|reviews?)$/i.test(value)) continue;
-    if (/^(?:access denied|just a moment|attention required|verify(?: you are human)?)$/i.test(value)) continue;
+    if (/^(?:alibaba(?:\.com)?|product details?|product information|specifications?|overview|description|reviews?|about this product|related products?)$/i.test(value)) continue;
+    if (/^(?:access denied|just a moment|attention required|verify(?: you are human?)?|sign in|log in)$/i.test(value)) continue;
     return value;
+  }
+  return null;
+}
+
+function looseProduct(source) {
+  const patterns = [
+    /(?:^|\n)\s*(?:Product(?: Name| Title)?|Item(?: Name)?|Nom du produit)\s*[:：-]\s*([^\n|]{4,220})/im,
+    /(?:^|\n)\s*\[[^\]]{8,220}\]\((?:https?:\/\/)?(?:www\.)?alibaba\.com[^)]*\)/im,
+  ];
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    if (match?.[1]) return clean(match[1]);
   }
   return null;
 }
 
 export function parseAlibabaReaderText(text = '') {
   const source = String(text ?? '');
-  const product = labelled(source, ['Product Name', 'Product title', 'Product', 'Title', 'Nom du produit', 'Nom du produit :'])
+  const product = labelled(source, TABLE_LABELS.product)
     || headingProduct(source)
-    || clean(source.match(/^(?:[-*+]\s+)?(?:\*\*)?Product(?: Name| Title)?(?:\*\*)?\s+(?:\*\*)?([^\n|]+)/im)?.[1] || '')
+    || looseProduct(source)
     || null;
 
-  const displayedPrice = number(labelled(source, ['Price', 'Starting price', 'From', 'Prix', 'Prix de départ']))
+  const displayedPrice = number(labelled(source, TABLE_LABELS.price))
     ?? number(source.match(/(?:US\s*\$|USD|\$|€|EUR)\s*([0-9]+(?:[.,][0-9]+)?)/i)?.[1])
     ?? number(source.match(/([0-9]+(?:[.,][0-9]+)?)\s*(?:USD|US\s*\$|EUR|€|\$)/i)?.[1]);
 
-  const moq = number(labelled(source, [
-    'MOQ',
-    'Min. Order Quantity',
-    'Min Order Quantity',
-    'Minimum order quantity',
-    'Minimum order',
-    'Min. Order',
-    'Min Order',
-    'Quantité minimale',
-  ]))
+  const moq = number(labelled(source, TABLE_LABELS.moq))
     ?? number(source.match(/(?:MOQ|min\.?\s*order(?:\s*quantity)?|minimum order(?: quantity)?)[^0-9]{0,80}([0-9]+(?:[.,][0-9]+)?)/i)?.[1]);
 
-  const supplier = labelled(source, [
-    'Supplier',
-    'Supplier Name',
-    'Verified Supplier',
-    'Company Name',
-    'Seller',
-    'Store Name',
-    'Manufacturer',
-    'Brand',
-    'Fournisseur',
-    'Fabricant',
-  ]);
-  const supplierCountry = labelled(source, ['Supplier country', 'Country of supplier', 'Country of origin', 'Pays du fournisseur', 'Pays']);
+  const supplier = labelled(source, TABLE_LABELS.supplier);
+  const supplierCountry = labelled(source, TABLE_LABELS.country);
 
   return Object.freeze({
     product,
