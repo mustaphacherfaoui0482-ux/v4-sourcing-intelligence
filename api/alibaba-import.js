@@ -83,7 +83,10 @@ export default async function handler(req, res) {
 
   if (!fetched || extractionStatus(fetched.extracted) === 'EMPTY') {
     try {
-      const readerFetched = await fetchAlibabaThroughReader(url);
+      // If Alibaba resolved the short URL, give Reader the resolved product URL.
+      // This avoids asking Reader to interpret the original /x/... redirect itself.
+      const readerUrl = fetched?.url || url;
+      const readerFetched = await fetchAlibabaThroughReader(readerUrl);
       const parsedReader = parseFetchedPage(readerFetched);
       if (extractionStatus(parsedReader.extracted) !== 'EMPTY' || !fetched) fetched = parsedReader;
       if (extractionStatus(parsedReader.extracted) === 'EMPTY' && fetched && fetched.acquisition !== 'JINA_READER') {
@@ -104,7 +107,8 @@ export default async function handler(req, res) {
     ok: true, source: 'Alibaba.com', sourceUrl: url,
     acquisition: fetched.acquisition || 'DIRECT', acquisitionUrl: fetched.acquisitionUrl || url,
     extracted: fetched.extracted, fetchStatus: 'page_retrieved', extractionStatus: status,
-    evidenceStatus: status === 'EMPTY' ? 'INSUFFICIENT' : status === 'COMPLETE' ? 'EXTRACTED' : 'PARTIAL', directError,
+    evidenceStatus: status === 'EMPTY' ? 'INSUFFICIENT' : status === 'COMPLETE' ? 'EXTRACTED' : 'PARTIAL',
+    directError,
     ...(fetched.readerDiagnostics ? { readerDiagnostics: fetched.readerDiagnostics } : {}),
   });
 }
