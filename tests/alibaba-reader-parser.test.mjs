@@ -28,6 +28,12 @@ test('Reader parser accepts price before label and decimal comma', () => {
   assert.equal(parsed.supplier, 'Example Factory');
 });
 
+test('Reader parser accepts common Alibaba min-order and company labels', () => {
+  const parsed = parseAlibabaReaderText('Product Name: Portable LED Lamp\nPrice: US$ 4.80\nMin. Order Quantity: 100 Pieces\nCompany Name: Example Factory');
+  assert.equal(parsed.moq, 100);
+  assert.equal(parsed.supplier, 'Example Factory');
+});
+
 test('Reader parser keeps unknown values null', () => {
   const parsed = parseAlibabaReaderText('Alibaba page retrieved\nNo product data available');
   assert.equal(parsed.product, null);
