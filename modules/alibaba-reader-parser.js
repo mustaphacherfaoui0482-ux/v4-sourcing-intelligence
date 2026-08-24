@@ -24,6 +24,8 @@ const TABLE_LABELS = {
   country: ['Supplier country', 'Country of supplier', 'Country of origin', 'Supplier Country', 'Pays du fournisseur', 'Pays'],
 };
 
+const ALL_TABLE_LABELS = Object.values(TABLE_LABELS).flat().map(normalLabel);
+
 function markdownRows(source) {
   return source.split(/\r?\n/)
     .map((line) => line.trim())
@@ -36,18 +38,18 @@ function tableValue(source, labels) {
   const wanted = labels.map(normalLabel);
   const rows = markdownRows(source);
 
-  // Horizontal table: require at least two recognized headers so a vertical
-  // key/value row cannot be mistaken for a horizontal table header.
+  // Horizontal table: detect a header row containing at least two known V4 fields,
+  // then read the requested field from the corresponding value column.
   for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
     const header = rows[rowIndex];
-    const headerIndexes = wanted.map((label) => header.findIndex((cell) => normalLabel(cell) === label));
-    const matched = headerIndexes.filter((index) => index >= 0);
-    if (matched.length < 2) continue;
+    const knownHeaderCount = header.filter((cell) => ALL_TABLE_LABELS.includes(normalLabel(cell))).length;
+    if (knownHeaderCount < 2) continue;
+    const requestedIndex = header.findIndex((cell) => wanted.includes(normalLabel(cell)));
+    if (requestedIndex < 0) continue;
     for (let valueIndex = rowIndex + 1; valueIndex < rows.length; valueIndex += 1) {
       const values = rows[valueIndex];
       if (values.length < header.length) continue;
-      const index = matched[0];
-      if (values[index] != null) return clean(values[index]);
+      if (values[requestedIndex] != null) return clean(values[requestedIndex]);
     }
   }
 
