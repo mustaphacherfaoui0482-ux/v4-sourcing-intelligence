@@ -40,8 +40,6 @@ function tableValue(source, labels) {
   const wanted = labels.map(normalLabel);
   const rows = markdownRows(source);
 
-  // Horizontal table: detect a header row containing at least two known V4 fields,
-  // then read the requested field from the corresponding value column.
   for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
     const header = rows[rowIndex];
     const knownHeaderCount = header.filter((cell) => ALL_TABLE_LABELS.includes(normalLabel(cell))).length;
@@ -55,7 +53,6 @@ function tableValue(source, labels) {
     }
   }
 
-  // Vertical key/value table: | Product | value |
   for (const row of rows) {
     if (row.length !== 2) continue;
     if (wanted.includes(normalLabel(row[0]))) return clean(row[1]);
@@ -65,7 +62,6 @@ function tableValue(source, labels) {
 }
 
 function compactLabelled(source, labels) {
-  const requested = labels.map(normalLabel);
   const allLabels = ALL_LABELS_SORTED.map(escapeRegex).join('|');
   if (!allLabels) return null;
 
@@ -85,8 +81,14 @@ function labelled(text, labels) {
   const source = String(text);
   const fromTable = tableValue(source, labels);
   if (fromTable) return fromTable;
-  const wanted = labels.map(normalLabel);
 
+  // Reader sometimes collapses the whole Alibaba block to one line. Parse this
+  // representation before the generic line parser so Product cannot swallow
+  // the following Price/MOQ/Supplier labels.
+  const compact = compactLabelled(source, labels);
+  if (compact) return compact;
+
+  const wanted = labels.map(normalLabel);
   for (const line of source.split(/\r?\n/)) {
     const cells = line.split('|').map(clean).filter(Boolean);
     if (cells.length < 2 || /^[-: ]+$/.test(cells.join(''))) continue;
@@ -101,13 +103,6 @@ function labelled(text, labels) {
     const m = source.match(re);
     if (m?.[1]) return clean(m[1]);
   }
-
-  // Some reader responses collapse the whole product block onto one line.
-  // Stop at the next known field label, including when that label is another
-  // field from the same category. This prevents Product from swallowing Price,
-  // MOQ, Supplier, etc. while remaining evidence-only.
-  const compact = compactLabelled(source, labels);
-  if (compact) return compact;
 
   return null;
 }
