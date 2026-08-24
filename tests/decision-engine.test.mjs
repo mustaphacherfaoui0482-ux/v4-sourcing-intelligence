@@ -36,6 +36,17 @@ test('decision engine rejects high risk even with strong potential', () => {
   assert.equal(result.decision, DECISIONS.REJECT);
 });
 
+test('decision engine rejects maximum risk even with maximum positive signals', () => {
+  const result = evaluateOpportunity({
+    demandScore: 100,
+    sourcingScore: 100,
+    profitabilityScore: 100,
+    confidence: 100,
+    riskScore: 100,
+  });
+  assert.equal(result.decision, DECISIONS.REJECT);
+});
+
 test('decision engine can recommend a test for a strong opportunity', () => {
   const result = evaluateOpportunity({
     demandScore: 90,
