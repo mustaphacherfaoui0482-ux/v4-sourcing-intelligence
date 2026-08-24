@@ -64,6 +64,23 @@ function tableValue(source, labels) {
   return null;
 }
 
+function compactLabelled(source, labels) {
+  const requested = labels.map(normalLabel);
+  const allLabels = ALL_LABELS_SORTED.map(escapeRegex).join('|');
+  if (!allLabels) return null;
+
+  for (const label of labels) {
+    const escaped = escapeRegex(label);
+    const re = new RegExp(
+      `(?:^|\\s|\\|)(?:${escaped})\\s*(?::|：|-|\\|)\\s*([\\s\\S]*?)(?=\\s+(?:${allLabels})\\s*(?::|：|-|\\|)|\\s*$)`,
+      'i',
+    );
+    const match = source.match(re);
+    if (match?.[1]) return clean(match[1]);
+  }
+  return null;
+}
+
 function labelled(text, labels) {
   const source = String(text);
   const fromTable = tableValue(source, labels);
@@ -86,21 +103,11 @@ function labelled(text, labels) {
   }
 
   // Some reader responses collapse the whole product block onto one line.
-  // Capture the requested label until the next known V4 label instead of
-  // requiring a newline. This remains evidence-only: no value is invented.
-  const requested = labels.map(normalLabel);
-  for (const label of ALL_LABELS_SORTED) {
-    if (!requested.includes(normalLabel(label))) continue;
-    const escaped = escapeRegex(label);
-    const stopLabels = ALL_LABELS_SORTED
-      .filter((candidate) => normalLabel(candidate) !== normalLabel(label))
-      .map(escapeRegex)
-      .join('|');
-    const stop = stopLabels ? `(?=\\s+(?:${stopLabels})\\s*(?::|：|-|\\|)|\\s*$)` : '(?=\\s*$)';
-    const re = new RegExp(`(?:^|\\s|\\|)(?:${escaped})\\s*(?::|：|-|\\|)\\s*([^\\n|]{1,220}?)${stop}`, 'i');
-    const m = source.match(re);
-    if (m?.[1]) return clean(m[1]);
-  }
+  // Stop at the next known field label, including when that label is another
+  // field from the same category. This prevents Product from swallowing Price,
+  // MOQ, Supplier, etc. while remaining evidence-only.
+  const compact = compactLabelled(source, labels);
+  if (compact) return compact;
 
   return null;
 }
