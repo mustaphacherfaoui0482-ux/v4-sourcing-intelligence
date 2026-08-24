@@ -34,6 +34,21 @@ test('Reader parser accepts common Alibaba min-order and company labels', () => 
   assert.equal(parsed.supplier, 'Example Factory');
 });
 
+test('Reader parser extracts fields from a Markdown table returned by the reader', () => {
+  const parsed = parseAlibabaReaderText(`| Product Name | Portable LED Lamp |\n| --- | --- |\n| Price | US$ 4.80 |\n| MOQ | 100 Pieces |\n| Supplier | Example Factory |\n| Country of origin | China |`);
+  assert.equal(parsed.product, 'Portable LED Lamp');
+  assert.equal(parsed.displayedPrice, 4.8);
+  assert.equal(parsed.moq, 100);
+  assert.equal(parsed.supplier, 'Example Factory');
+  assert.equal(parsed.supplierCountry, 'China');
+});
+
+test('Reader parser ignores generic reader headings', () => {
+  const parsed = parseAlibabaReaderText('# Alibaba.com\n## Product Details\nNo product data available');
+  assert.equal(parsed.product, null);
+  assert.equal(parsed.parserStatus, 'NO_STRUCTURED_DATA');
+});
+
 test('Reader parser keeps unknown values null', () => {
   const parsed = parseAlibabaReaderText('Alibaba page retrieved\nNo product data available');
   assert.equal(parsed.product, null);
