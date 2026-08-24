@@ -35,10 +35,30 @@ export function parseAlibabaReaderText(text = '') {
     ?? number(source.match(/(?:US\s*\$|USD|\$|€|EUR)\s*([0-9]+(?:[.,][0-9]+)?)/i)?.[1])
     ?? number(source.match(/([0-9]+(?:[.,][0-9]+)?)\s*(?:USD|US\s*\$|EUR|€|\$)/i)?.[1]);
 
-  const moq = number(labelled(source, ['MOQ', 'Minimum order quantity', 'Minimum order', 'Quantité minimale']))
-    ?? number(source.match(/(?:MOQ|minimum order quantity|minimum order)[^0-9]{0,80}([0-9]+(?:[.,][0-9]+)?)/i)?.[1]);
+  const moq = number(labelled(source, [
+    'MOQ',
+    'Min. Order Quantity',
+    'Min Order Quantity',
+    'Minimum order quantity',
+    'Minimum order',
+    'Min. Order',
+    'Min Order',
+    'Quantité minimale',
+  ]))
+    ?? number(source.match(/(?:MOQ|min\.?\s*order(?:\s*quantity)?|minimum order(?: quantity)?)[^0-9]{0,80}([0-9]+(?:[.,][0-9]+)?)/i)?.[1]);
 
-  const supplier = labelled(source, ['Supplier', 'Manufacturer', 'Brand', 'Fournisseur', 'Fabricant']);
+  const supplier = labelled(source, [
+    'Supplier',
+    'Supplier Name',
+    'Verified Supplier',
+    'Company Name',
+    'Seller',
+    'Store Name',
+    'Manufacturer',
+    'Brand',
+    'Fournisseur',
+    'Fabricant',
+  ]);
   const supplierCountry = labelled(source, ['Supplier country', 'Country of supplier', 'Country of origin', 'Pays du fournisseur', 'Pays']);
 
   return Object.freeze({
