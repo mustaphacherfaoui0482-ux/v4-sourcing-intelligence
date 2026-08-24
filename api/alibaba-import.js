@@ -1,4 +1,5 @@
 import { isAlibabaHostname, normalizeAlibabaUrl, parseAlibabaProductHtml } from '../modules/alibaba-parser.js';
+import { fetchAlibabaThroughReader } from './alibaba-reader-fallback.js';
 
 const MAX_BYTES = 2_000_000;
 const TIMEOUT_MS = 8_000;
@@ -45,41 +46,71 @@ async function fetchAlibabaPage(url) {
 
     const text = await response.text();
     if (Buffer.byteLength(text, 'utf8') > MAX_BYTES) throw new Error('alibaba_response_too_large');
-    return { url: current, html: text };
+    return { url: current, html: text, acquisition: 'DIRECT' };
   }
   throw new Error('alibaba_too_many_redirects');
+}
+
+function parseFetchedPage(fetched) {
+  return {
+    ...fetched,
+    extracted: parseAlibabaProductHtml(fetched.html),
+  };
 }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return send(res, 405, { ok: false, error: 'method_not_allowed' });
 
+  const rawUrl = req.body?.url;
+  const url = normalizeAlibabaUrl(rawUrl);
+  if (!url) return send(res, 400, { ok: false, error: 'invalid_alibaba_url' });
+
+  let fetched = null;
+  let directError = null;
+
   try {
-    const rawUrl = req.body?.url;
-    const url = normalizeAlibabaUrl(rawUrl);
-    if (!url) return send(res, 400, { ok: false, error: 'invalid_alibaba_url' });
-
-    const fetched = await fetchAlibabaPage(url);
-    const extracted = parseAlibabaProductHtml(fetched.html);
-    const status = extractionStatus(extracted);
-
-    return send(res, 200, {
-      ok: true,
-      source: 'Alibaba.com',
-      sourceUrl: fetched.url,
-      extracted,
-      fetchStatus: 'page_retrieved',
-      extractionStatus: status,
-      evidenceStatus: status === 'EMPTY' ? 'INSUFFICIENT' : status === 'COMPLETE' ? 'EXTRACTED' : 'PARTIAL',
-    });
+    fetched = parseFetchedPage(await fetchAlibabaPage(url));
   } catch (error) {
-    return send(res, 200, {
-      ok: false,
-      source: 'Alibaba.com',
-      error: error instanceof Error ? error.message : 'alibaba_fetch_failed',
-      extracted: { product: null, displayedPrice: null, moq: null, supplier: null, supplierCountry: null },
-      fetchStatus: 'fetch_failed',
-      extractionStatus: 'EMPTY',
-      evidenceStatus: 'UNKNOWN',
-    });
+    directError = error instanceof Error ? error.message : 'alibaba_fetch_failed';
   }
+
+  if (!fetched || extractionStatus(fetched.extracted) === 'EMPTY') {
+    try {
+      const readerFetched = await fetchAlibabaThroughReader(url);
+      const parsedReader = parseFetchedPage(readerFetched);
+      if (extractionStatus(parsedReader.extracted) !== 'EMPTY') {
+        fetched = parsedReader;
+      } else if (!fetched) {
+        fetched = parsedReader;
+      }
+    } catch (error) {
+      if (!fetched) {
+        return send(res, 200, {
+          ok: false,
+          source: 'Alibaba.com',
+          sourceUrl: url,
+          error: error instanceof Error ? error.message : directError || 'alibaba_fetch_failed',
+          directError,
+          extracted: { product: null, displayedPrice: null, moq: null, supplier: null, supplierCountry: null },
+          fetchStatus: 'fetch_failed',
+          extractionStatus: 'EMPTY',
+          evidenceStatus: 'UNKNOWN',
+        });
+      }
+    }
+  }
+
+  const status = extractionStatus(fetched.extracted);
+  return send(res, 200, {
+    ok: true,
+    source: 'Alibaba.com',
+    sourceUrl: url,
+    acquisition: fetched.acquisition || 'DIRECT',
+    acquisitionUrl: fetched.acquisitionUrl || url,
+    extracted: fetched.extracted,
+    fetchStatus: 'page_retrieved',
+    extractionStatus: status,
+    evidenceStatus: status === 'EMPTY' ? 'INSUFFICIENT' : status === 'COMPLETE' ? 'EXTRACTED' : 'PARTIAL',
+    directError,
+  });
 }
