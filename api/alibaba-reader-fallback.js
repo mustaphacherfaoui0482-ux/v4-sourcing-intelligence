@@ -9,60 +9,25 @@ function readerHeaders({ json = false } = {}) {
   if (process.env.JINA_API_KEY) { headers.authorization = `Bearer ${process.env.JINA_API_KEY}`; headers['x-engine'] = 'browser'; headers['x-respond-timing'] = 'network-idle'; }
   return headers;
 }
-
-export function buildReaderProxyUrl(url) {
-  const normalized = normalizeAlibabaUrl(url);
-  if (!normalized || !isAlibabaHostname(new URL(normalized).hostname)) return null;
-  return `${READER_ENDPOINT}${normalized}`;
-}
-
+export function buildReaderProxyUrl(url) { const normalized = normalizeAlibabaUrl(url); if (!normalized || !isAlibabaHostname(new URL(normalized).hostname)) return null; return `${READER_ENDPOINT}${normalized}`; }
 function readerCandidates(normalized) {
   const candidates = [normalized];
   try {
     const url = new URL(normalized);
-    if (/\.alibaba\.com$/i.test(url.hostname) && url.hostname !== 'www.alibaba.com') {
-      const global = new URL(url.href);
-      global.hostname = 'www.alibaba.com';
-      candidates.push(global.href);
-    }
+    if (/\.alibaba\.com$/i.test(url.hostname) && url.hostname !== 'www.alibaba.com') { const global = new URL(url.href); global.hostname = 'www.alibaba.com'; candidates.push(global.href); }
+    const http = new URL(normalized); http.protocol = 'http:'; candidates.push(http.href);
+    if (/\.alibaba\.com$/i.test(url.hostname) && url.hostname !== 'www.alibaba.com') { const globalHttp = new URL(url.href); globalHttp.hostname = 'www.alibaba.com'; globalHttp.protocol = 'http:'; candidates.push(globalHttp.href); }
   } catch {}
   return [...new Set(candidates)];
 }
-
-async function readResponse(response) {
-  const contentType = response.headers.get('content-type') || '';
-  const text = await response.text();
-  if (Buffer.byteLength(text, 'utf8') > MAX_BYTES) throw new Error('alibaba_reader_response_too_large');
-  if (!text.trim()) throw new Error('alibaba_reader_empty_response');
-  return { text, contentType };
-}
-
-function readerContent(text, contentType) {
-  if (!/json/i.test(contentType)) return text;
-  try { const payload = JSON.parse(text); return payload?.data?.content || payload?.content || payload?.data?.markdown || payload?.markdown || text; } catch { return text; }
-}
-
-async function fetchReaderPost(normalized) {
-  const response = await fetch(READER_ENDPOINT, { method: 'POST', redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { ...readerHeaders({ json: true }), 'content-type': 'application/json' }, body: JSON.stringify({ url: normalized }) });
-  if (!response.ok) throw new Error(`alibaba_reader_post_http_${response.status}`);
-  const { text, contentType } = await readResponse(response);
-  return { html: readerContent(text, contentType), acquisition: 'JINA_READER', acquisitionUrl: `${READER_ENDPOINT}POST`, targetUrl: normalized, contentType: 'text/markdown' };
-}
-
-async function fetchReaderGet(normalized) {
-  const proxyUrl = buildReaderProxyUrl(normalized);
-  const response = await fetch(proxyUrl, { method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT_MS), headers: readerHeaders() });
-  if (!response.ok) throw new Error(`alibaba_reader_get_http_${response.status}`);
-  const { text, contentType } = await readResponse(response);
-  return { html: readerContent(text, contentType), acquisition: 'JINA_READER', acquisitionUrl: proxyUrl, targetUrl: normalized, contentType: /json/i.test(contentType) ? 'text/markdown' : (contentType || 'text/plain') };
-}
-
+async function readResponse(response) { const contentType = response.headers.get('content-type') || ''; const text = await response.text(); if (Buffer.byteLength(text, 'utf8') > MAX_BYTES) throw new Error('alibaba_reader_response_too_large'); if (!text.trim()) throw new Error('alibaba_reader_empty_response'); return { text, contentType }; }
+function readerContent(text, contentType) { if (!/json/i.test(contentType)) return text; try { const payload = JSON.parse(text); return payload?.data?.content || payload?.content || payload?.data?.markdown || payload?.markdown || text; } catch { return text; } }
+async function fetchReaderPost(normalized) { const response = await fetch(READER_ENDPOINT, { method: 'POST', redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { ...readerHeaders({ json: true }), 'content-type': 'application/json' }, body: JSON.stringify({ url: normalized }) }); if (!response.ok) throw new Error(`alibaba_reader_post_http_${response.status}`); const { text, contentType } = await readResponse(response); return { html: readerContent(text, contentType), acquisition: 'JINA_READER', acquisitionUrl: `${READER_ENDPOINT}POST`, targetUrl: normalized, contentType: 'text/markdown' }; }
+async function fetchReaderGet(normalized) { const proxyUrl = buildReaderProxyUrl(normalized); const response = await fetch(proxyUrl, { method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT_MS), headers: readerHeaders() }); if (!response.ok) throw new Error(`alibaba_reader_get_http_${response.status}`); const { text, contentType } = await readResponse(response); return { html: readerContent(text, contentType), acquisition: 'JINA_READER', acquisitionUrl: proxyUrl, targetUrl: normalized, contentType: /json/i.test(contentType) ? 'text/markdown' : (contentType || 'text/plain') }; }
 export async function fetchAlibabaThroughReader(url) {
-  const normalized = normalizeAlibabaUrl(url);
-  if (!normalized || !isAlibabaHostname(new URL(normalized).hostname)) throw new Error('invalid_alibaba_url');
-  const candidates = readerCandidates(normalized);
+  const normalized = normalizeAlibabaUrl(url); if (!normalized || !isAlibabaHostname(new URL(normalized).hostname)) throw new Error('invalid_alibaba_url');
   const errors = [];
-  for (const candidate of candidates) {
+  for (const candidate of readerCandidates(normalized)) {
     try { return await fetchReaderGet(candidate); } catch (error) { errors.push(`get:${candidate}:${error instanceof Error ? error.message : 'failed'}`); }
     try { return await fetchReaderPost(candidate); } catch (error) { errors.push(`post:${candidate}:${error instanceof Error ? error.message : 'failed'}`); }
   }
