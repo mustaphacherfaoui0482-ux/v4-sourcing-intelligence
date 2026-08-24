@@ -6,14 +6,19 @@ const ACTIVE_KEY = 'v4-sourcing.active-opportunity.v1';
 
 function normalizeUrl(value) {
   try {
-    const url = new URL(String(value || '').trim());
-    if (url.protocol !== 'https:' || !/^(www\\.)?alibaba\\.com$/i.test(url.hostname)) return null;
+    const cleaned = String(value || '')
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .trim();
+    const url = new URL(cleaned);
+    const hostname = url.hostname.toLowerCase();
+    const validHost = hostname === 'alibaba.com' || hostname.endsWith('.alibaba.com');
+    if (url.protocol !== 'https:' || !validHost) return null;
     return url.href;
   } catch { return null; }
 }
 
 function parseDecimal(value) {
-  const raw = String(value ?? '').trim().replace(/\\s/g, '').replace(',', '.');
+  const raw = String(value ?? '').trim().replace(/\s/g, '').replace(',', '.');
   if (!raw) return null;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
