@@ -18,6 +18,19 @@ export function extractionStatus(extracted = {}) {
   return 'PARTIAL';
 }
 
+function diagnostics(fetched) {
+  if (!fetched) return null;
+  const text = String(fetched.html || '');
+  return {
+    acquisition: fetched.acquisition || 'DIRECT',
+    responseBytes: Buffer.byteLength(text, 'utf8'),
+    parserStatus: fetched.extracted?.parserStatus || 'UNKNOWN',
+    hasAlibabaMarker: /alibaba/i.test(text),
+    hasProductMarker: /product|产品|商品/i.test(text),
+    hasPriceMarker: /price|prix|US\$|USD|EUR|€|\$/i.test(text),
+  };
+}
+
 async function fetchAlibabaPage(url) {
   let current = url;
   for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -73,6 +86,9 @@ export default async function handler(req, res) {
       const readerFetched = await fetchAlibabaThroughReader(url);
       const parsedReader = parseFetchedPage(readerFetched);
       if (extractionStatus(parsedReader.extracted) !== 'EMPTY' || !fetched) fetched = parsedReader;
+      if (extractionStatus(parsedReader.extracted) === 'EMPTY' && fetched && fetched.acquisition !== 'JINA_READER') {
+        fetched = { ...fetched, readerDiagnostics: diagnostics(parsedReader) };
+      }
     } catch (error) {
       if (!fetched) return send(res, 200, {
         ok: false, source: 'Alibaba.com', sourceUrl: url,
@@ -89,5 +105,6 @@ export default async function handler(req, res) {
     acquisition: fetched.acquisition || 'DIRECT', acquisitionUrl: fetched.acquisitionUrl || url,
     extracted: fetched.extracted, fetchStatus: 'page_retrieved', extractionStatus: status,
     evidenceStatus: status === 'EMPTY' ? 'INSUFFICIENT' : status === 'COMPLETE' ? 'EXTRACTED' : 'PARTIAL', directError,
+    ...(fetched.readerDiagnostics ? { readerDiagnostics: fetched.readerDiagnostics } : {}),
   });
 }
