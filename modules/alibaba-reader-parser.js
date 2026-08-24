@@ -13,8 +13,22 @@ const number = (value) => {
   return Number.isFinite(n) ? n : null;
 };
 
+const normalLabel = (value) => clean(value).replace(/[：:|]/g, '').trim().toLowerCase();
+
 function labelled(text, labels) {
   const source = String(text);
+  const wanted = labels.map(normalLabel);
+
+  // Jina/reader output frequently uses Markdown tables. In that format the
+  // label and value are separate cells, so a line-oriented regex is insufficient.
+  for (const line of source.split(/\r?\n/)) {
+    const cells = line.split('|').map(clean).filter(Boolean);
+    if (cells.length < 2 || /^[-: ]+$/.test(cells.join(''))) continue;
+    for (let i = 0; i < cells.length - 1; i += 1) {
+      if (wanted.includes(normalLabel(cells[i]))) return clean(cells[i + 1]);
+    }
+  }
+
   for (const label of labels) {
     const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const re = new RegExp(`(?:^|\\n|\\|)\\s*(?:[-*+]\\s+)?(?:\\*\\*)?(?:${escaped})(?:\\*\\*)?\\s*(?::|：|-|\\|)\\s*(?:\\*\\*)?([^\\n|]{1,180}?)(?:\\*\\*)?\\s*(?=\\n|\\||$)`, 'im');
@@ -24,11 +38,22 @@ function labelled(text, labels) {
   return null;
 }
 
+function headingProduct(source) {
+  for (const match of source.matchAll(/^#{1,6}\s+([^\n]+)/gm)) {
+    const value = clean(match[1]);
+    if (!value) continue;
+    if (/^(?:alibaba(?:\.com)?|product details?|specifications?|overview|description|reviews?)$/i.test(value)) continue;
+    if (/^(?:access denied|just a moment|attention required|verify(?: you are human)?)$/i.test(value)) continue;
+    return value;
+  }
+  return null;
+}
+
 export function parseAlibabaReaderText(text = '') {
   const source = String(text ?? '');
-  const product = labelled(source, ['Product Name', 'Product title', 'Product', 'Title', 'Nom du produit'])
-    || clean(source.match(/^#{1,6}\s+([^\n]+)/m)?.[1] || '')
-    || clean(source.match(/^(?:[-*+]\s+)?(?:\*\*)?Product(?: Name| Title)?(?:\*\*)?\s+([^\n|]+)/im)?.[1] || '')
+  const product = labelled(source, ['Product Name', 'Product title', 'Product', 'Title', 'Nom du produit', 'Nom du produit :'])
+    || headingProduct(source)
+    || clean(source.match(/^(?:[-*+]\s+)?(?:\*\*)?Product(?: Name| Title)?(?:\*\*)?\s+(?:\*\*)?([^\n|]+)/im)?.[1] || '')
     || null;
 
   const displayedPrice = number(labelled(source, ['Price', 'Starting price', 'From', 'Prix', 'Prix de départ']))
