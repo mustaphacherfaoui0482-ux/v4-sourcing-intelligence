@@ -19,9 +19,9 @@ const normalLabel = (value) => clean(value).replace(/[：:|]/g, '').trim().toLow
 const TABLE_LABELS = {
   product: ['Product Name', 'Product title', 'Product', 'Title', 'Item Name', 'Nom du produit'],
   price: ['Price', 'Price Range', 'Starting price', 'From', 'Unit Price', 'Prix', 'Prix de départ'],
-  moq: ['MOQ', 'Min. Order Quantity', 'Min Order Quantity', 'Minimum order quantity', 'Minimum order', 'Min. Order', 'Min Order', 'Quantité minimale'],
-  supplier: ['Supplier', 'Supplier Name', 'Verified Supplier', 'Company Name', 'Seller', 'Store Name', 'Manufacturer', 'Brand', 'Fournisseur', 'Fabricant'],
-  country: ['Supplier country', 'Country of supplier', 'Country of origin', 'Supplier Country', 'Country', 'Pays du fournisseur', 'Pays'],
+  moq: ['MOQ', 'Min. Order Quantity', 'Min Order Quantity', 'Minimum order quantity', 'Minimum order', 'Min. Order', 'Min Order', 'Minimum order qty', 'Min order qty', 'Quantité minimale'],
+  supplier: ['Supplier', 'Supplier Name', 'Verified Supplier', 'Company Name', 'Company', 'Seller Name', 'Seller', 'Store Name', 'Manufacturer', 'Factory', 'Brand', 'Fournisseur', 'Fabricant'],
+  country: ['Supplier country', 'Country of supplier', 'Supplier Country', 'Country of origin', 'Country name', 'Country', 'Pays du fournisseur', 'Pays'],
 };
 
 const ALL_TABLE_LABELS = Object.values(TABLE_LABELS).flat().map(normalLabel);
@@ -137,7 +137,7 @@ export function parseAlibabaReaderText(text = '') {
     ?? number(source.match(/([0-9]+(?:[.,][0-9]+)?)\s*(?:USD|US\s*\$|EUR|€|\$)/i)?.[1]);
 
   const moq = number(labelled(source, TABLE_LABELS.moq))
-    ?? number(source.match(/(?:MOQ|min\.?\s*order(?:\s*quantity)?|minimum order(?: quantity)?)[^0-9]{0,80}([0-9]+(?:[.,][0-9]+)?)/i)?.[1]);
+    ?? number(source.match(/(?:MOQ|min\.?\s*order(?:\s*quantity|\s*qty)?|minimum order(?: quantity| qty)?)[^0-9]{0,80}([0-9]+(?:[.,][0-9]+)?)/i)?.[1]);
 
   const supplier = labelled(source, TABLE_LABELS.supplier);
   const supplierCountry = labelled(source, TABLE_LABELS.country);
