@@ -36,17 +36,18 @@ function tableValue(source, labels) {
   const wanted = labels.map(normalLabel);
   const rows = markdownRows(source);
 
-  // Horizontal table: | Product | Price | MOQ | Supplier |\n| title | $4 | 10 | Factory |
-  // Evaluate this before key/value rows so the header is never mistaken for a value.
+  // Horizontal table: require at least two recognized headers so a vertical
+  // key/value row cannot be mistaken for a horizontal table header.
   for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
     const header = rows[rowIndex];
     const headerIndexes = wanted.map((label) => header.findIndex((cell) => normalLabel(cell) === label));
-    if (!headerIndexes.some((index) => index >= 0)) continue;
+    const matched = headerIndexes.filter((index) => index >= 0);
+    if (matched.length < 2) continue;
     for (let valueIndex = rowIndex + 1; valueIndex < rows.length; valueIndex += 1) {
       const values = rows[valueIndex];
       if (values.length < header.length) continue;
-      const index = headerIndexes.find((candidate) => candidate >= 0);
-      if (index != null && values[index] != null) return clean(values[index]);
+      const index = matched[0];
+      if (values[index] != null) return clean(values[index]);
     }
   }
 
