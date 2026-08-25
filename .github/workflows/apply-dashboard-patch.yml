@@ -40,3 +40,4 @@ jobs:
           git diff --cached --exit-code && exit 1 || true
           git commit -m 'fix(dashboard): map potential to potentialScore'
           git push origin HEAD:main
+# Trigger commit after workflow creation so GitHub registers the workflow.
