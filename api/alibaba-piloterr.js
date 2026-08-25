@@ -5,8 +5,13 @@ function firstNonEmpty(...values) {
   return values.find((value) => value !== null && value !== undefined && String(value).trim() !== '') ?? null;
 }
 
+function getApiKey() {
+  const raw = process.env.PILOTERR_API_KEY || '';
+  return raw.trim().split(/\s+/)[0] || null;
+}
+
 export function piloterrConfigured() {
-  return Boolean(process.env.PILOTERR_API_KEY);
+  return Boolean(getApiKey());
 }
 
 export function normalizePiloterrProduct(payload = {}) {
@@ -33,7 +38,8 @@ export function normalizePiloterrProduct(payload = {}) {
 }
 
 export async function fetchAlibabaThroughPiloterr(url) {
-  if (!piloterrConfigured()) throw new Error('piloterr_not_configured');
+  const key = getApiKey();
+  if (!key) throw new Error('piloterr_not_configured');
   const endpoint = `${ENDPOINT}?query=${encodeURIComponent(url)}`;
   const response = await fetch(endpoint, {
     method: 'GET',
@@ -41,7 +47,7 @@ export async function fetchAlibabaThroughPiloterr(url) {
     signal: AbortSignal.timeout(TIMEOUT_MS),
     headers: {
       accept: 'application/json',
-      'x-api-key': process.env.PILOTERR_API_KEY,
+      'x-api-key': key,
     },
   });
   if (!response.ok) throw new Error(`piloterr_http_${response.status}`);
