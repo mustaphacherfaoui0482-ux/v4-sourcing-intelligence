@@ -19,9 +19,9 @@ const normalLabel = (value) => clean(value).replace(/[：:|]/g, '').replace(/^[-
 const TABLE_LABELS = {
   product: ['Product Name', 'Product title', 'Product', 'Title', 'Item Name', 'Nom du produit'],
   price: ['Price', 'Price Range', 'Starting price', 'From', 'Unit Price', 'Prix', 'Prix de départ'],
-  moq: ['MOQ', 'Min. Order Quantity', 'Min Order Quantity', 'Minimum order quantity', 'Minimum order', 'Min. Order', 'Min Order', 'Minimum order qty', 'Min order qty', 'Quantité minimale'],
-  supplier: ['Supplier', 'Supplier Name', 'Verified Supplier', 'Company Name', 'Company', 'Seller Name', 'Seller', 'Store Name', 'Manufacturer', 'Factory', 'Brand', 'Fournisseur', 'Fabricant'],
-  country: ['Supplier country', 'Country of supplier', 'Supplier Country', 'Country of origin', 'Country name', 'Country', 'Pays du fournisseur', 'Pays'],
+  moq: ['MOQ', 'Min. Order Quantity', 'Min Order Quantity', 'Minimum order quantity', 'Minimum order', 'Min. Order', 'Min Order', 'Minimum order qty', 'Min order qty', 'Minimum order size', 'Order quantity', 'Quantité minimale'],
+  supplier: ['Supplier', 'Supplier Name', 'Verified Supplier', 'Supplier company', 'Company Name', 'Company', 'Seller Name', 'Seller', 'Store Name', 'Manufacturer', 'Factory', 'Brand', 'Fournisseur', 'Fabricant'],
+  country: ['Supplier country', 'Supplier location', 'Supplier location country', 'Country of supplier', 'Supplier Country', 'Country of origin', 'Country name', 'Country', 'Location', 'Pays du fournisseur', 'Pays'],
 };
 
 const ALL_TABLE_LABELS = Object.values(TABLE_LABELS).flat().map(normalLabel);
@@ -39,7 +39,6 @@ function markdownRows(source) {
 function tableValue(source, labels) {
   const wanted = labels.map(normalLabel);
   const rows = markdownRows(source);
-
   for (let rowIndex = 0; rowIndex < rows.length - 1; rowIndex += 1) {
     const header = rows[rowIndex];
     const knownHeaderCount = header.filter((cell) => ALL_TABLE_LABELS.includes(normalLabel(cell))).length;
@@ -52,27 +51,17 @@ function tableValue(source, labels) {
       if (values[requestedIndex] != null) return clean(values[requestedIndex]);
     }
   }
-
   for (const row of rows) {
-    if (row.length !== 2) continue;
-    if (wanted.includes(normalLabel(row[0]))) return clean(row[1]);
+    if (row.length === 2 && wanted.includes(normalLabel(row[0]))) return clean(row[1]);
   }
-
   return null;
 }
 
 function compactLabelled(source, labels) {
   if (/\r?\n/.test(source)) return null;
-
   const allLabels = ALL_LABELS_SORTED.map(escapeRegex).join('|');
-  if (!allLabels) return null;
-
   for (const label of labels) {
-    const escaped = escapeRegex(label);
-    const re = new RegExp(
-      `(?:^|\\s|\\|)(?:${escaped})\\s*(?::|：|-|\\|)\\s*([\\s\\S]*?)(?=\\s+(?:${allLabels})\\s*(?::|：|-|\\|)|\\s*$)`,
-      'i',
-    );
+    const re = new RegExp(`(?:^|\\s|\\|)(?:${escapeRegex(label)})\\s*(?::|：|-|\\|)\\s*([\\s\\S]*?)(?=\\s+(?:${allLabels})\\s*(?::|：|-|\\|)|\\s*$)`, 'i');
     const match = source.match(re);
     if (match?.[1]) return clean(match[1]);
   }
@@ -92,21 +81,16 @@ function nextNonEmptyLine(lines, index) {
 function splitLineLabelled(source, labels) {
   const wanted = labels.map(normalLabel);
   const lines = source.split(/\r?\n/);
-
   for (let i = 0; i < lines.length; i += 1) {
     const raw = lines[i].trim();
     if (!raw) continue;
-
     const cells = raw.split('|').map(clean).filter(Boolean);
     if (cells.length >= 2 && wanted.includes(normalLabel(cells[0]))) return clean(cells.slice(1).join(' '));
-
     const withoutMarker = raw.replace(/^[-*+]\s+/, '').trim();
     if (!wanted.includes(normalLabel(withoutMarker))) continue;
-
     const value = nextNonEmptyLine(lines, i);
     if (value) return clean(value.replace(/^[-*+]\s+/, ''));
   }
-
   return null;
 }
 
@@ -114,13 +98,10 @@ function labelled(text, labels) {
   const source = String(text);
   const fromTable = tableValue(source, labels);
   if (fromTable) return fromTable;
-
   const splitLine = splitLineLabelled(source, labels);
   if (splitLine) return splitLine;
-
   const compact = compactLabelled(source, labels);
   if (compact) return compact;
-
   const wanted = labels.map(normalLabel);
   for (const line of source.split(/\r?\n/)) {
     const cells = line.split('|').map(clean).filter(Boolean);
@@ -129,14 +110,11 @@ function labelled(text, labels) {
       if (wanted.includes(normalLabel(cells[i]))) return clean(cells[i + 1]);
     }
   }
-
   for (const label of labels) {
-    const escaped = escapeRegex(label);
-    const re = new RegExp(`(?:^|\\n|\\|)\\s*(?:[-*+]\\s+)?(?:\\*\\*)?(?:${escaped})(?:\\*\\*)?\\s*(?::|：|-|\\|)\\s*(?:\\*\\*)?([^\\n|]{1,180}?)(?:\\*\\*)?\\s*(?=\\n|\\||$)`, 'im');
+    const re = new RegExp(`(?:^|\\n|\\|)\\s*(?:[-*+]\\s+)?(?:\\*\\*)?(?:${escapeRegex(label)})(?:\\*\\*)?\\s*(?::|：|-|\\|)\\s*(?:\\*\\*)?([^\\n|]{1,180}?)(?:\\*\\*)?\\s*(?=\\n|\\||$)`, 'im');
     const m = source.match(re);
     if (m?.[1]) return clean(m[1]);
   }
-
   return null;
 }
 
@@ -156,31 +134,25 @@ function looseProduct(source) {
   return match?.[1] ? clean(match[1]) : null;
 }
 
+function looseLabelled(source, labels, valuePattern = '[^\\n|]{1,180}') {
+  for (const label of labels) {
+    const re = new RegExp(`(?:^|\\n)\\s*(?:[-*+]\\s+)?(?:\\*\\*)?${escapeRegex(label)}(?:\\*\\*)?\\s*(?::|：|-)\\s*(${valuePattern})`, 'im');
+    const match = source.match(re);
+    if (match?.[1]) return clean(match[1]);
+  }
+  return null;
+}
+
 export function parseAlibabaReaderText(text = '') {
   const source = String(text ?? '');
-  const product = labelled(source, TABLE_LABELS.product)
-    || headingProduct(source)
-    || looseProduct(source)
-    || null;
-
+  const product = labelled(source, TABLE_LABELS.product) || headingProduct(source) || looseProduct(source) || null;
   const displayedPrice = number(labelled(source, TABLE_LABELS.price))
     ?? number(source.match(/(?:US\s*\$|USD|\$|€|EUR)\s*([0-9]+(?:[.,][0-9]+)?)/i)?.[1])
     ?? number(source.match(/([0-9]+(?:[.,][0-9]+)?)\s*(?:USD|US\s*\$|EUR|€|\$)/i)?.[1]);
-
   const moq = number(labelled(source, TABLE_LABELS.moq))
-    ?? number(source.match(/(?:MOQ|min\.?\s*order(?:\s*quantity|\s*qty)?|minimum order(?: quantity| qty)?)[^0-9]{0,80}([0-9]+(?:[.,][0-9]+)?)/i)?.[1]);
-
-  const supplier = labelled(source, TABLE_LABELS.supplier);
-  const supplierCountry = labelled(source, TABLE_LABELS.country);
-
-  return Object.freeze({
-    product,
-    displayedPrice,
-    moq,
-    supplier,
-    supplierCountry,
-    parserStatus: [product, displayedPrice, moq, supplier, supplierCountry].some(v => v != null && v !== '')
-      ? 'PARTIAL_OR_COMPLETE'
-      : 'NO_STRUCTURED_DATA',
-  });
+    ?? number(looseLabelled(source, ['Minimum order quantity', 'Minimum order qty', 'Min. order quantity', 'Min order qty', 'Min. order', 'Min order', 'MOQ']))
+    ?? number(source.match(/(?:MOQ|min\.?\s*order(?:\s*quantity|\s*qty)?|minimum order(?: quantity| qty)?)[^0-9]{0,100}([0-9]+(?:[.,]\d+)?)/i)?.[1]);
+  const supplier = labelled(source, TABLE_LABELS.supplier) || looseLabelled(source, ['Supplier', 'Supplier Name', 'Supplier company', 'Company Name', 'Seller Name', 'Manufacturer', 'Factory']);
+  const supplierCountry = labelled(source, TABLE_LABELS.country) || looseLabelled(source, ['Supplier country', 'Supplier location', 'Supplier location country', 'Country of supplier', 'Country of origin', 'Country name']);
+  return Object.freeze({ product, displayedPrice, moq, supplier, supplierCountry, parserStatus: [product, displayedPrice, moq, supplier, supplierCountry].some(v => v != null && v !== '') ? 'PARTIAL_OR_COMPLETE' : 'NO_STRUCTURED_DATA' });
 }
