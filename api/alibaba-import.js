@@ -1,4 +1,4 @@
-import { isAlibabaHostname, normalizeAlibabaUrl, parseAlibabaProductHtml } from '../modules/alibaba-parser.js';
+import { isAlibabaHostname, normalizeAlibabaUrl, parseAlibabaProductHtml, extractAlibabaProductCandidates, isAlibabaSearchUrl } from '../modules/alibaba-parser.js';
 import { parseAlibabaReaderText } from '../modules/alibaba-reader-parser.js';
 import { fetchAlibabaThroughPiloterr, piloterrConfigured } from './alibaba-piloterr.js';
 import { fetchAlibabaThroughReader } from './alibaba-reader-fallback.js';
@@ -17,25 +17,24 @@ function parseFetchedPage(fetched) { const isReader = fetched.acquisition === 'J
 export default async function handler(req, res) {
   if (req.method !== 'POST') return send(res, 405, { ok: false, error: 'method_not_allowed' });
   const url = normalizeAlibabaUrl(req.body?.url); if (!url) return send(res, 400, { ok: false, error: 'invalid_alibaba_url' });
-  let fetched = null; let directError = null; let providerError = null; let readerDiagnostics = null; let readerUsed = false;
+  const searchUrl = isAlibabaSearchUrl(url);
+  let fetched = null; let directError = null; let providerError = null; let readerDiagnostics = null; let readerUsed = false; let productCandidates = [];
   const providerConfigured = piloterrConfigured();
 
   if (providerConfigured) {
     try {
       fetched = await fetchAlibabaThroughPiloterr(url);
       fetched.extracted = { ...fetched.extracted, parserStatus: extractionStatus(fetched.extracted) };
-    } catch (error) {
-      providerError = error instanceof Error ? error.message : 'piloterr_failed';
-    }
-  } else {
-    providerError = 'piloterr_not_configured';
-  }
+    } catch (error) { providerError = error instanceof Error ? error.message : 'piloterr_failed'; }
+  } else { providerError = 'piloterr_not_configured'; }
 
   if (!fetched) {
     try { fetched = parseFetchedPage(await fetchAlibabaPage(url)); } catch (error) { directError = error instanceof Error ? error.message : 'alibaba_fetch_failed'; }
   }
 
-  if (fetched && extractionStatus(fetched.extracted) === 'EMPTY' && fetched.canonicalUrl && fetched.canonicalUrl !== fetched.url) {
+  if (searchUrl && fetched?.html) productCandidates = extractAlibabaProductCandidates(fetched.html, fetched.url || url);
+
+  if (fetched && extractionStatus(fetched.extracted) === 'EMPTY' && fetched.canonicalUrl && fetched.canonicalUrl !== fetched.url && !searchUrl) {
     try {
       const canonicalFetched = parseFetchedPage(await fetchAlibabaPage(fetched.canonicalUrl));
       const merged = mergeAlibabaExtraction(fetched.extracted, canonicalFetched.extracted);
@@ -43,7 +42,7 @@ export default async function handler(req, res) {
     } catch (error) { directError = `${directError ? `${directError};` : ''}canonical_fetch_failed:${error instanceof Error ? error.message : 'failed'}`; }
   }
 
-  if (!fetched || extractionStatus(fetched.extracted) !== 'COMPLETE') {
+  if (!searchUrl && (!fetched || extractionStatus(fetched.extracted) !== 'COMPLETE')) {
     try {
       const readerUrl = fetched?.canonicalUrl || fetched?.url || url;
       const readerFetched = await fetchAlibabaThroughReader(readerUrl);
@@ -52,14 +51,12 @@ export default async function handler(req, res) {
       const before = extractionStatus(fetched?.extracted || {}); const merged = mergeAlibabaExtraction(fetched?.extracted || {}, parsedReader.extracted || {}); const after = extractionStatus(merged);
       if (!fetched) { fetched = { ...parsedReader, url: parsedReader.url || url, acquisition: 'JINA_READER', extracted: merged }; readerUsed = true; }
       else { fetched = { ...fetched, acquisition: after !== before ? `${fetched.acquisition}+JINA_READER` : fetched.acquisition, acquisitionUrl: readerFetched.acquisitionUrl || fetched.acquisitionUrl, extracted: merged }; readerUsed = after !== before; }
-    } catch (error) {
-      readerDiagnostics = { error: error instanceof Error ? error.message : 'alibaba_reader_failed', canonicalUrl: fetched?.canonicalUrl || null };
-    }
+    } catch (error) { readerDiagnostics = { error: error instanceof Error ? error.message : 'alibaba_reader_failed', canonicalUrl: fetched?.canonicalUrl || null }; }
   }
 
-  if (!fetched) return send(res, 200, { ok: false, source: 'Alibaba.com', sourceUrl: url, error: providerError || directError || readerDiagnostics?.error || 'acquisition_failed', directError, providerError, providerConfigured, readerDiagnostics, acquisitionStatus: 'BROWSER_REQUIRED', fetchStatus: 'fetch_failed', extractionStatus: 'EMPTY', evidenceStatus: 'UNKNOWN', extracted: { product: null, displayedPrice: null, moq: null, supplier: null, supplierCountry: null } });
+  if (!fetched) return send(res, 200, { ok: false, source: 'Alibaba.com', sourceUrl: url, error: searchUrl ? 'search_page_acquisition_failed' : (providerError || directError || readerDiagnostics?.error || 'acquisition_failed'), directError, providerError, providerConfigured, readerDiagnostics, acquisitionStatus: 'BROWSER_REQUIRED', fetchStatus: 'fetch_failed', extractionStatus: 'EMPTY', evidenceStatus: 'UNKNOWN', productCandidates, extracted: { product: null, displayedPrice: null, moq: null, supplier: null, supplierCountry: null } });
 
   const status = extractionStatus(fetched.extracted);
-  const acquisitionStatus = status === 'COMPLETE' ? 'COMPLETE' : status === 'PARTIAL' ? 'PARTIAL' : 'BROWSER_REQUIRED';
-  return send(res, 200, { ok: true, source: 'Alibaba.com', sourceUrl: url, acquisition: fetched.acquisition || (readerUsed ? 'DIRECT+JINA_READER' : 'DIRECT'), acquisitionUrl: fetched.acquisitionUrl || url, extracted: fetched.extracted, fetchStatus: 'page_retrieved', extractionStatus: status, acquisitionStatus, evidenceStatus: status === 'EMPTY' ? 'INSUFFICIENT' : status === 'COMPLETE' ? 'EXTRACTED' : 'PARTIAL', directError, providerError, providerConfigured, readerDiagnostics: readerDiagnostics || diagnostics(fetched) });
+  const acquisitionStatus = searchUrl ? (productCandidates.length ? 'CANDIDATES_FOUND' : 'BROWSER_REQUIRED') : (status === 'COMPLETE' ? 'COMPLETE' : status === 'PARTIAL' ? 'PARTIAL' : 'BROWSER_REQUIRED');
+  return send(res, 200, { ok: true, source: 'Alibaba.com', sourceUrl: url, acquisition: fetched.acquisition || (readerUsed ? 'DIRECT+JINA_READER' : 'DIRECT'), acquisitionUrl: fetched.acquisitionUrl || url, searchUrl, productCandidates, extracted: fetched.extracted, fetchStatus: 'page_retrieved', extractionStatus: status, acquisitionStatus, evidenceStatus: searchUrl ? (productCandidates.length ? 'CANDIDATES_ONLY' : 'INSUFFICIENT') : (status === 'EMPTY' ? 'INSUFFICIENT' : status === 'COMPLETE' ? 'EXTRACTED' : 'PARTIAL'), directError, providerError, providerConfigured, readerDiagnostics: readerDiagnostics || diagnostics(fetched) });
 }
