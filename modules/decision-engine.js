@@ -1,5 +1,5 @@
-// V4 Sourcing Intelligence — Decision Engine v3
-// Deterministic decision rules. Unknown inputs remain unknown and cannot be converted into a score.
+// V4 Sourcing Intelligence — Decision Engine v4
+// Decision rules consume the official potential score; this engine does not calculate a second global score.
 
 import { evaluateOfferForDecision } from './v4-offer-engine-adapter.js';
 
@@ -18,8 +18,7 @@ function clampScore(value) {
 }
 
 export function evaluateOpportunity(data = {}) {
-  const demand = clampScore(data.demandScore);
-  const sourcing = clampScore(data.sourcingScore);
+  const potential = clampScore(data.potentialScore);
   const risk = clampScore(data.riskScore);
   const confidence = clampScore(data.confidence);
 
@@ -31,7 +30,7 @@ export function evaluateOpportunity(data = {}) {
     if (offer.economics.status === 'insufficient_data') {
       return {
         decision: DECISIONS.WAIT,
-        score: null,
+        potential,
         profitability: null,
         offer,
         reason: 'Données économiques insuffisantes',
@@ -43,7 +42,7 @@ export function evaluateOpportunity(data = {}) {
     if (profitability === null || marginScore === null || resilience === null) {
       return {
         decision: DECISIONS.WAIT,
-        score: null,
+        potential,
         profitability: null,
         offer,
         reason: 'Données insuffisantes pour calculer la rentabilité',
@@ -61,34 +60,20 @@ export function evaluateOpportunity(data = {}) {
     }
   }
 
-  if (
-    demand === null ||
-    sourcing === null ||
-    profitability === null ||
-    confidence === null ||
-    risk === null
-  ) {
+  if (potential === null || confidence === null || risk === null) {
     return {
       decision: DECISIONS.WAIT,
-      score: null,
+      potential,
       profitability,
       offer,
       reason: 'Données insuffisantes',
     };
   }
 
-  const score = Math.round(
-    demand * 0.25 +
-    sourcing * 0.2 +
-    profitability * 0.3 +
-    confidence * 0.15 +
-    (100 - risk) * 0.1,
-  );
-
   if (confidence < 40) {
     return {
       decision: DECISIONS.WAIT,
-      score,
+      potential,
       profitability,
       offer,
       reason: 'Données insuffisantes',
@@ -97,25 +82,25 @@ export function evaluateOpportunity(data = {}) {
 
   if (
     risk > 70 ||
-    score < 40 ||
+    potential < 40 ||
     offer?.recommendation === 'avoid'
   ) {
     return {
       decision: DECISIONS.REJECT,
-      score,
+      potential,
       profitability,
       offer,
-      reason: 'Risque ou économie insuffisante',
+      reason: 'Risque ou potentiel insuffisant',
     };
   }
 
   if (
-    score >= 75 &&
+    potential >= 75 &&
     (!offer || offer.resilience >= 67)
   ) {
     return {
       decision: DECISIONS.TEST,
-      score,
+      potential,
       profitability,
       offer,
       reason: 'Opportunité à tester',
@@ -124,7 +109,7 @@ export function evaluateOpportunity(data = {}) {
 
   return {
     decision: DECISIONS.ANALYZE,
-    score,
+    potential,
     profitability,
     offer,
     reason: 'Analyse complémentaire nécessaire',
