@@ -15,7 +15,8 @@ test('dashboard runtime derives KPI state from canonical V4 engines', () => {
   assert.equal(Math.round(state.economics.netContributionMargin * 10) / 10, 52.1);
   assert.equal(Math.round(state.economics.maxCacAtTargetMargin * 100) / 100, 12.71);
   assert.equal(state.decision.decision, 'TESTER');
-  assert.equal(state.decision.score, 92);
+  assert.equal(state.decision.potential, 90);
+  assert.equal('score' in state.decision, false);
 });
 
 test('empty opportunity remains empty and does not invent an opportunity', () => {
