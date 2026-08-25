@@ -1,4 +1,5 @@
-const ENDPOINT = 'https://api.piloterr.com/v2/alibaba/product';
+const PRODUCT_ENDPOINT = 'https://api.piloterr.com/v2/alibaba/product';
+const SEARCH_ENDPOINT = 'https://api.piloterr.com/v2/alibaba/search';
 const TIMEOUT_MS = 30_000;
 
 function firstNonEmpty(...values) {
@@ -37,11 +38,36 @@ export function normalizePiloterrProduct(payload = {}) {
   });
 }
 
-export async function fetchAlibabaThroughPiloterr(url) {
+function searchItems(payload = {}) {
+  const candidates = payload?.results || payload?.items || payload?.data?.results || payload?.data?.items || payload?.products || payload?.result?.items || [];
+  return Array.isArray(candidates) ? candidates : [];
+}
+
+function normalizePiloterrSearch(payload = {}) {
+  const candidates = searchItems(payload).map((item) => ({
+    url: firstNonEmpty(item?.listing_url, item?.url, item?.product_url),
+    productId: firstNonEmpty(item?.product_id, item?.id),
+    title: firstNonEmpty(item?.title, item?.name),
+    displayedPrice: firstNonEmpty(item?.price?.min, item?.price?.display, item?.price, item?.price_usd),
+    moq: firstNonEmpty(item?.moq, item?.minimum_order_quantity, item?.min_order_quantity, item?.price?.quantity_prices?.[0]?.min_quantity),
+    supplier: firstNonEmpty(item?.seller?.company_name, item?.supplier, item?.seller?.name),
+    supplierCountry: firstNonEmpty(item?.seller?.country, item?.country, item?.seller?.country_code),
+  })).filter((item) => item.url || item.productId || item.title);
+
+  return Object.freeze({
+    candidates,
+    total: firstNonEmpty(payload?.total, payload?.pagination?.total, payload?.count),
+    page: firstNonEmpty(payload?.page, payload?.pagination?.page),
+    pages: firstNonEmpty(payload?.pages, payload?.pagination?.pages),
+    providerPayload: payload,
+  });
+}
+
+export async function fetchAlibabaThroughPiloterr(url, { search = false } = {}) {
   const key = getApiKey();
   if (!key) throw new Error('piloterr_not_configured');
-  const endpoint = `${ENDPOINT}?query=${encodeURIComponent(url)}`;
-  const response = await fetch(endpoint, {
+  const endpoint = search ? SEARCH_ENDPOINT : PRODUCT_ENDPOINT;
+  const response = await fetch(`${endpoint}?query=${encodeURIComponent(url)}`, {
     method: 'GET',
     redirect: 'follow',
     signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -52,6 +78,20 @@ export async function fetchAlibabaThroughPiloterr(url) {
   });
   if (!response.ok) throw new Error(`piloterr_http_${response.status}`);
   const payload = await response.json();
+
+  if (search) {
+    const extracted = normalizePiloterrSearch(payload);
+    if (!extracted.candidates.length) throw new Error('piloterr_empty_search');
+    return {
+      html: JSON.stringify(payload),
+      contentType: 'application/json',
+      acquisition: 'PILOTERR_SEARCH_API',
+      acquisitionUrl: endpoint,
+      targetUrl: url,
+      extracted,
+    };
+  }
+
   const extracted = normalizePiloterrProduct(payload);
   if (!extracted.product && extracted.displayedPrice == null && extracted.moq == null && !extracted.supplier && !extracted.supplierCountry) {
     throw new Error('piloterr_empty_product');
@@ -60,7 +100,7 @@ export async function fetchAlibabaThroughPiloterr(url) {
     html: JSON.stringify(payload),
     contentType: 'application/json',
     acquisition: 'PILOTERR_BROWSER_API',
-    acquisitionUrl: ENDPOINT,
+    acquisitionUrl: endpoint,
     targetUrl: url,
     extracted,
   };
