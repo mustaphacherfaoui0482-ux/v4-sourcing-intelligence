@@ -12,7 +12,7 @@ export function mergeAlibabaExtraction(primary = {}, secondary = {}) { const mer
 function diagnostics(fetched) { if (!fetched) return null; const text = String(fetched.html || ''); return { acquisition: fetched.acquisition || 'DIRECT', acquisitionUrl: fetched.acquisitionUrl || fetched.url || null, canonicalUrl: fetched.canonicalUrl || null, responseBytes: Buffer.byteLength(text, 'utf8'), parserStatus: fetched.extracted?.parserStatus || 'UNKNOWN', hasAlibabaMarker: /alibaba/i.test(text), hasProductMarker: /product|产品|商品/i.test(text), hasPriceMarker: /price|prix|US\$|USD|EUR|€|\$/i.test(text), hasMoqMarker: /MOQ|minimum order|minimum quantity|最小起订量/i.test(text), hasSupplierMarker: /supplier|manufacturer|seller|factory|供应商|制造商/i.test(text) }; }
 function extractCanonicalAlibabaUrl(html, baseUrl) { const source = String(html || ''); const patterns = [/<link[^>]+rel=["'][^"']*canonical[^"']*["'][^>]+href=["']([^"']+)["']/i, /<link[^>]+href=["']([^"']+)["'][^>]+rel=["'][^"']*canonical[^"']*["']/i, /<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i, /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:url["']/i, /(https?:\/\/[^"'<>\s]+\.alibaba\.com\/product-detail\/[^"'<>\s]+?\.html(?:\?[^"'<>\s]+)?)/i, /(https?:\/\/[^"'<>\s]+\.alibaba\.com\/product-detail\/[^"'<>\s]+)/i, /(\/product-detail\/[^"'<>\s]+?\.html(?:\?[^"'<>\s]+)?)/i]; for (const pattern of patterns) { const match = source.match(pattern); if (!match?.[1]) continue; try { const normalized = normalizeAlibabaUrl(new URL(match[1], baseUrl).href); if (normalized && isAlibabaHostname(new URL(normalized).hostname)) return normalized; } catch {} } return null; }
 async function fetchAlibabaPage(url) { let current = url; for (let attempt = 0; attempt < 3; attempt += 1) { const response = await fetch(current, { redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'user-agent': 'Mozilla/5.0 (compatible; V4-Sourcing-Intelligence/1.0; +https://vercel.com)', accept: 'text/html,application/xhtml+xml' } }); if (response.status >= 300 && response.status < 400) { const location = response.headers.get('location'); const next = normalizeAlibabaUrl(location ? new URL(location, current).href : ''); if (!next || !isAlibabaHostname(new URL(next).hostname)) throw new Error('alibaba_redirect_blocked'); current = next; continue; } if (!response.ok) throw new Error(`alibaba_http_${response.status}`); const contentType = response.headers.get('content-type') || ''; if (!contentType.includes('text/html')) throw new Error('alibaba_non_html_response'); const contentLength = Number(response.headers.get('content-length') || 0); if (contentLength > MAX_BYTES) throw new Error('alibaba_response_too_large'); const text = await response.text(); if (Buffer.byteLength(text, 'utf8') > MAX_BYTES) throw new Error('alibaba_response_too_large'); return { url: current, html: text, acquisition: 'DIRECT', contentType, canonicalUrl: extractCanonicalAlibabaUrl(text, current) }; } throw new Error('alibaba_too_many_redirects'); }
-function parseFetchedPage(fetched) { const isPiloterr = fetched.acquisition === 'PILOTERR_BROWSER_API' || fetched.acquisition === 'PILOTERR_SEARCH_API'; const isReader = fetched.acquisition === 'JINA_READER' || !/html/i.test(fetched.contentType || ''); return isPiloterr ? fetched : { ...fetched, extracted: isReader ? parseAlibabaReaderText(fetched.html) : parseAlibabaProductHtml(fetched.html) }; }
+function parseFetchedPage(fetched) { const isReader = fetched.acquisition === 'JINA_READER' || !/html/i.test(fetched.contentType || ''); return fetched.acquisition === 'PILOTERR_BROWSER_API' ? fetched : { ...fetched, extracted: isReader ? parseAlibabaReaderText(fetched.html) : parseAlibabaProductHtml(fetched.html) }; }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return send(res, 405, { ok: false, error: 'method_not_allowed' });
@@ -24,18 +24,18 @@ export default async function handler(req, res) {
   if (providerConfigured) {
     try {
       fetched = await fetchAlibabaThroughPiloterr(url, { search: searchUrl });
-      fetched.extracted = searchUrl ? fetched.extracted : { ...fetched.extracted, parserStatus: extractionStatus(fetched.extracted) };
-      if (searchUrl && Array.isArray(fetched.extracted?.candidates)) productCandidates = fetched.extracted.candidates;
+      if (searchUrl) productCandidates = fetched.extracted?.candidates || [];
+      else fetched.extracted = { ...fetched.extracted, parserStatus: extractionStatus(fetched.extracted) };
     } catch (error) { providerError = error instanceof Error ? error.message : 'piloterr_failed'; }
   } else { providerError = 'piloterr_not_configured'; }
 
-  if (!fetched) {
+  if (!fetched && !searchUrl) {
     try { fetched = parseFetchedPage(await fetchAlibabaPage(url)); } catch (error) { directError = error instanceof Error ? error.message : 'alibaba_fetch_failed'; }
   }
 
-  if (searchUrl && fetched?.html && productCandidates.length === 0) productCandidates = extractAlibabaProductCandidates(fetched.html, fetched.url || url);
+  if (searchUrl && fetched?.html && !productCandidates.length) productCandidates = extractAlibabaProductCandidates(fetched.html, fetched.url || url);
 
-  if (fetched && extractionStatus(fetched.extracted) === 'EMPTY' && fetched.canonicalUrl && fetched.canonicalUrl !== fetched.url && !searchUrl) {
+  if (fetched && !searchUrl && extractionStatus(fetched.extracted) === 'EMPTY' && fetched.canonicalUrl && fetched.canonicalUrl !== fetched.url) {
     try {
       const canonicalFetched = parseFetchedPage(await fetchAlibabaPage(fetched.canonicalUrl));
       const merged = mergeAlibabaExtraction(fetched.extracted, canonicalFetched.extracted);
@@ -57,7 +57,7 @@ export default async function handler(req, res) {
 
   if (!fetched) return send(res, 200, { ok: false, source: 'Alibaba.com', sourceUrl: url, error: searchUrl ? 'search_page_acquisition_failed' : (providerError || directError || readerDiagnostics?.error || 'acquisition_failed'), directError, providerError, providerConfigured, readerDiagnostics, acquisitionStatus: 'BROWSER_REQUIRED', fetchStatus: 'fetch_failed', extractionStatus: 'EMPTY', evidenceStatus: 'UNKNOWN', productCandidates, extracted: { product: null, displayedPrice: null, moq: null, supplier: null, supplierCountry: null } });
 
-  const status = extractionStatus(fetched.extracted);
+  const status = searchUrl ? 'EMPTY' : extractionStatus(fetched.extracted);
   const acquisitionStatus = searchUrl ? (productCandidates.length ? 'CANDIDATES_FOUND' : 'BROWSER_REQUIRED') : (status === 'COMPLETE' ? 'COMPLETE' : status === 'PARTIAL' ? 'PARTIAL' : 'BROWSER_REQUIRED');
-  return send(res, 200, { ok: true, source: 'Alibaba.com', sourceUrl: url, acquisition: fetched.acquisition || (readerUsed ? 'DIRECT+JINA_READER' : 'DIRECT'), acquisitionUrl: fetched.acquisitionUrl || url, searchUrl, productCandidates, extracted: fetched.extracted, fetchStatus: 'page_retrieved', extractionStatus: status, acquisitionStatus, evidenceStatus: searchUrl ? (productCandidates.length ? 'CANDIDATES_ONLY' : 'INSUFFICIENT') : (status === 'EMPTY' ? 'INSUFFICIENT' : status === 'COMPLETE' ? 'EXTRACTED' : 'PARTIAL'), directError, providerError, providerConfigured, readerDiagnostics: readerDiagnostics || diagnostics(fetched) });
+  return send(res, 200, { ok: true, source: 'Alibaba.com', sourceUrl: url, acquisition: fetched.acquisition || (readerUsed ? 'DIRECT+JINA_READER' : 'DIRECT'), acquisitionUrl: fetched.acquisitionUrl || url, searchUrl, productCandidates, extracted: searchUrl ? { product: null, displayedPrice: null, moq: null, supplier: null, supplierCountry: null } : fetched.extracted, fetchStatus: 'page_retrieved', extractionStatus: status, acquisitionStatus, evidenceStatus: searchUrl ? (productCandidates.length ? 'CANDIDATES_ONLY' : 'INSUFFICIENT') : (status === 'EMPTY' ? 'INSUFFICIENT' : status === 'COMPLETE' ? 'EXTRACTED' : 'PARTIAL'), directError, providerError, providerConfigured, readerDiagnostics: readerDiagnostics || diagnostics(fetched) });
 }
