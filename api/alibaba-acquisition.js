@@ -43,7 +43,11 @@ export async function acquireAlibabaProduct(url, { providers = createAlibabaAcqu
       const hasData = acquisitionHasData(fetched);
       attempts.push({ provider: provider.name || 'UNKNOWN', status: hasData ? 'DATA' : 'EMPTY' });
       if (hasData) {
-        return { ...fetched, acquisition: fetched.acquisition || provider.name || 'UNKNOWN', acquisitionAttempts: attempts };
+        return {
+          fetched: { ...fetched, acquisition: fetched.acquisition || provider.name || 'UNKNOWN', acquisitionAttempts: attempts },
+          acquisitionAttempts: attempts,
+          acquisitionStatus: 'ACQUIRED',
+        };
       }
     } catch (error) {
       attempts.push({ provider: provider.name || 'UNKNOWN', status: 'ERROR', error: error instanceof Error ? error.message : 'provider_failed' });
