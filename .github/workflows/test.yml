@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -32,39 +32,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Apply patch or run tests
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('modules/dashboard-runtime.js')
-          s = p.read_text()
-          old = "evaluateOpportunity({...o,landedCost:o.offer.landedCost,margin:economics.netContributionMargin})"
-          new = "evaluateOpportunity({...o,potentialScore:o.potential,landedCost:o.offer.landedCost,margin:economics.netContributionMargin})"
-          count = s.count(old)
-          if count == 0:
-              print('PATCH_ALREADY_PRESENT')
-          elif count == 1:
-              p.write_text(s.replace(old, new, 1))
-              print('PATCH_APPLIED')
-          else:
-              raise SystemExit(f'Expected exactly one target occurrence, found {count}')
-          PY
-          if grep -q "potentialScore:o.potential" modules/dashboard-runtime.js; then
-            if git diff --quiet -- modules/dashboard-runtime.js; then
-              npm test
-            else
-              git rm -f .github/workflows/apply-dashboard-patch.yml
-              git config user.name 'github-actions[bot]'
-              git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-              git add modules/dashboard-runtime.js .github/workflows/test.yml
-              git commit -m 'fix(dashboard): map potential to potentialScore'
-              git push origin HEAD:main
-            fi
-          else
-            npm test
-          fi
+      - name: Run tests
+        run: npm test
 
   deploy:
     needs: test
