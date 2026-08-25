@@ -154,9 +154,6 @@ export function parseAlibabaProductHtml(html = '') {
       /(?:US\$|USD|\$)\s*([0-9]+(?:[.,][0-9]+)?)/i,
     ]));
 
-  // Alibaba uses several different seller/company keys depending on the page
-  // template. Keep the extraction explicit: these are source fields, not
-  // inferred identities.
   const supplier = clean(productLd.brand?.name || productLd.manufacturer?.name)
     || clean(objectValue(objects, [
       'supplierName', 'supplier', 'supplierCompanyName', 'companyName', 'company',
@@ -184,17 +181,40 @@ export function parseAlibabaProductHtml(html = '') {
       'minOrderQuantity', 'minimumOrderQuantity', 'minimumOrderQty', 'minOrderQty',
       'moq', 'minimumOrder', 'minOrder',
     ]))
-    ?? number(first(source, [/(?:minimum order quantity|minimum order|MOQ|min\.?\s*order)[^0-9]{0,80}([0-9]+(?:[.,][0-9]+)?)/i]));
+    ?? number(first(source, [/(?:minimum order quantity|minimum order|MOQ|min\.?\s*order)[^0-9]{0,80}([0-9]+(?:[.,]\d+)?)/i]));
 
   const hasAny = Boolean(product || supplier || country || displayedPrice != null || moq != null);
-  return Object.freeze({
-    product: product || null,
-    displayedPrice,
-    moq,
-    supplier: supplier || null,
-    supplierCountry: country || null,
-    parserStatus: hasAny ? 'PARTIAL_OR_COMPLETE' : 'NO_STRUCTURED_DATA',
-  });
+  return Object.freeze({ product: product || null, displayedPrice, moq, supplier: supplier || null, supplierCountry: country || null, parserStatus: hasAny ? 'PARTIAL_OR_COMPLETE' : 'NO_STRUCTURED_DATA' });
+}
+
+export function extractAlibabaProductCandidates(html = '', baseUrl = '') {
+  const source = String(html ?? '');
+  const found = new Set();
+  const patterns = [
+    /https?:\/\/[^"'<>\s]+\.alibaba\.com\/product-detail\/[^"'<>\s]+/gi,
+    /(?:href|url|link|productUrl|product_url|productLink)\s*[=:]\s*["']([^"']*\/product-detail\/[^"']+)["']/gi,
+    /["'](\/product-detail\/[^"']+)["']/gi,
+  ];
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) {
+      const raw = decode(match[1] || match[0]).replace(/[),.;]+$/g, '');
+      try {
+        const absolute = new URL(raw, baseUrl || undefined).href;
+        const normalized = normalizeAlibabaUrl(absolute);
+        if (normalized && /\/product-detail\//i.test(new URL(normalized).pathname)) found.add(normalized);
+      } catch {}
+    }
+  }
+  return [...found].slice(0, 50);
+}
+
+export function isAlibabaSearchUrl(value) {
+  try {
+    const normalized = normalizeAlibabaUrl(value);
+    if (!normalized) return false;
+    const url = new URL(normalized);
+    return /^\/trade\/search(?:\/|$)/i.test(url.pathname) || /^\/search(?:\/|$)/i.test(url.pathname);
+  } catch { return false; }
 }
 
 export function isAlibabaHostname(hostname) {
