@@ -14,17 +14,17 @@ export const opportunitySchema = {
     availability: null
   },
   economics: {
-    purchaseCost: 0,
-    shippingCost: 0,
-    customsCost: 0,
-    landedCost: 0,
-    sellingPrice: 0,
-    margin: 0,
-    cac: 0
+    purchaseCost: null,
+    shippingCost: null,
+    customsCost: null,
+    landedCost: null,
+    sellingPrice: null,
+    margin: null,
+    cac: null
   },
   analysis: {
-    scoreV4: 0,
-    confidence: 0,
+    scoreV4: null,
+    confidence: null,
     risks: [],
     decision: 'PENDING'
   },
