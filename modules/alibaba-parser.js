@@ -189,7 +189,7 @@ export function parseAlibabaProductHtml(html = '') {
 
 export function extractAlibabaProductCandidates(html = '', baseUrl = '') {
   const source = String(html ?? '');
-  const found = new Set();
+  const found = new Map();
   const patterns = [
     /https?:\/\/[^"'<>\s]+\.alibaba\.com\/product-detail\/[^"'<>\s]+/gi,
     /(?:href|url|link|productUrl|product_url|productLink)\s*[=:]\s*["']([^"']*\/product-detail\/[^"']+)["']/gi,
@@ -201,11 +201,14 @@ export function extractAlibabaProductCandidates(html = '', baseUrl = '') {
       try {
         const absolute = new URL(raw, baseUrl || undefined).href;
         const normalized = normalizeAlibabaUrl(absolute);
-        if (normalized && /\/product-detail\//i.test(new URL(normalized).pathname)) found.add(normalized);
+        if (normalized && /\/product-detail\//i.test(new URL(normalized).pathname)) {
+          const position = match.index ?? Number.MAX_SAFE_INTEGER;
+          if (!found.has(normalized) || position < found.get(normalized).position) found.set(normalized, { url: normalized, position });
+        }
       } catch {}
     }
   }
-  return [...found].slice(0, 50);
+  return [...found.values()].sort((a, b) => a.position - b.position).map((item) => item.url).slice(0, 50);
 }
 
 export function isAlibabaSearchUrl(value) {
