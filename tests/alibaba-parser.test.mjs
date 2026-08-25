@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isAlibabaHostname, normalizeAlibabaUrl, parseAlibabaProductHtml } from '../modules/alibaba-parser.js';
+import { isAlibabaHostname, normalizeAlibabaUrl, parseAlibabaProductHtml, extractAlibabaProductCandidates, isAlibabaSearchUrl } from '../modules/alibaba-parser.js';
 
 test('Alibaba URL validation accepts HTTPS Alibaba product URLs only', () => {
   assert.equal(normalizeAlibabaUrl('https://www.alibaba.com/product-detail/example.html'), 'https://www.alibaba.com/product-detail/example.html');
@@ -11,6 +11,19 @@ test('Alibaba URL validation accepts HTTPS Alibaba product URLs only', () => {
   assert.equal(normalizeAlibabaUrl('https://example.com/product.html'), null);
   assert.equal(isAlibabaHostname('www.alibaba.com'), true);
   assert.equal(isAlibabaHostname('evil-alibaba.com'), false);
+});
+
+test('Alibaba search URL is classified separately from product URLs', () => {
+  assert.equal(isAlibabaSearchUrl('https://www.alibaba.com/trade/search?SearchText=products'), true);
+  assert.equal(isAlibabaSearchUrl('https://www.alibaba.com/product-detail/example.html'), false);
+});
+
+test('Alibaba search parser extracts only explicit product-detail candidates', () => {
+  const html = `<a href="/product-detail/Portable-Lamp_123.html">Lamp</a><a href="https://www.alibaba.com/product-detail/USB-Fan_456.html">Fan</a><a href="https://example.com/product-detail/fake.html">Fake</a>`;
+  assert.deepEqual(extractAlibabaProductCandidates(html, 'https://www.alibaba.com/trade/search?SearchText=products'), [
+    'https://www.alibaba.com/product-detail/Portable-Lamp_123.html',
+    'https://www.alibaba.com/product-detail/USB-Fan_456.html',
+  ]);
 });
 
 test('Alibaba parser extracts explicit JSON-LD product and offer values', () => {
@@ -55,13 +68,7 @@ test('Alibaba parser extracts explicit key values even when the JSON wrapper is 
 });
 
 test('Alibaba parser accepts seller/company and alternate MOQ/country keys from dynamic state', () => {
-  const state = JSON.stringify({
-    productTitle: 'Montre à Quartz Pour Homme',
-    price: '9.5',
-    minOrderQty: 1,
-    companyName: 'Foshan jintai zhengyu',
-    countryName: 'China',
-  });
+  const state = JSON.stringify({ productTitle: 'Montre à Quartz Pour Homme', price: '9.5', minOrderQty: 1, companyName: 'Foshan jintai zhengyu', countryName: 'China' });
   const parsed = parseAlibabaProductHtml(`<script>window.runParams = ${state};</script>`);
   assert.equal(parsed.product, 'Montre à Quartz Pour Homme');
   assert.equal(parsed.displayedPrice, 9.5);
