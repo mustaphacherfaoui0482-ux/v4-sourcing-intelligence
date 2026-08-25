@@ -20,6 +20,17 @@ function readerHeaders({ json = false } = {}) {
   return headers;
 }
 
+export function isAlibabaSearchUrl(value) {
+  try {
+    const normalized = normalizeAlibabaUrl(value);
+    if (!normalized) return false;
+    const url = new URL(normalized);
+    return /^\/trade\/search(?:\/|$)/i.test(url.pathname) || /^\/search(?:\/|$)/i.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
 export function buildReaderProxyUrl(url) {
   const normalized = normalizeAlibabaUrl(url);
   if (!normalized || !isAlibabaHostname(new URL(normalized).hostname)) return null;
@@ -35,15 +46,6 @@ function readerCandidates(normalized) {
       const global = new URL(url.href);
       global.hostname = 'www.alibaba.com';
       candidates.push(global.href);
-    }
-    const http = new URL(normalized);
-    http.protocol = 'http:';
-    candidates.push(http.href);
-    if (host.endsWith('.alibaba.com') && host !== 'www.alibaba.com') {
-      const globalHttp = new URL(url.href);
-      globalHttp.hostname = 'www.alibaba.com';
-      globalHttp.protocol = 'http:';
-      candidates.push(globalHttp.href);
     }
   } catch {}
   return [...new Set(candidates)];
@@ -82,6 +84,7 @@ async function fetchReaderPost(normalized) {
 
 async function fetchReaderGet(normalized) {
   const proxyUrl = buildReaderProxyUrl(normalized);
+  if (!proxyUrl) throw new Error('alibaba_reader_proxy_url_unavailable');
   const response = await fetch(proxyUrl, { method: 'GET', redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT_MS), headers: readerHeaders() });
   if (!response.ok) throw new Error(`alibaba_reader_get_http_${response.status}`);
   const { text, contentType } = await readResponse(response);
@@ -91,6 +94,8 @@ async function fetchReaderGet(normalized) {
 export async function fetchAlibabaThroughReader(url) {
   const normalized = normalizeAlibabaUrl(url);
   if (!normalized || !isAlibabaHostname(new URL(normalized).hostname)) throw new Error('invalid_alibaba_url');
+  if (isAlibabaSearchUrl(normalized)) throw new Error('alibaba_search_url_requires_product_candidates');
+
   const errors = [];
   const candidates = readerCandidates(normalized);
   const preferPost = Boolean(process.env.JINA_API_KEY);
