@@ -3,8 +3,8 @@ export const ProductSchema = {
   name: "",
   source: "",
   supplier: "",
-  landedCost: 0,
-  salePrice: 0,
-  moq: 0,
+  landedCost: null,
+  salePrice: null,
+  moq: null,
   confidence: "to_confirm"
 };
