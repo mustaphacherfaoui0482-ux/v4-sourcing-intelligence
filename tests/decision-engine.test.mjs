@@ -4,9 +4,7 @@ import { DECISIONS, evaluateOpportunity } from '../modules/decision-engine.js';
 
 test('decision engine waits when confidence is insufficient', () => {
   const result = evaluateOpportunity({
-    demandScore: 95,
-    sourcingScore: 95,
-    profitabilityScore: 95,
+    potentialScore: 95,
     confidence: 20,
     riskScore: 0,
   });
@@ -15,46 +13,53 @@ test('decision engine waits when confidence is insufficient', () => {
 
 test('decision engine waits when a required signal is UNKNOWN', () => {
   const result = evaluateOpportunity({
-    demandScore: null,
-    sourcingScore: 95,
-    profitabilityScore: 95,
+    potentialScore: null,
     confidence: 95,
     riskScore: 0,
   });
   assert.equal(result.decision, DECISIONS.WAIT);
-  assert.equal(result.score, null);
+  assert.equal(result.potential, null);
 });
 
 test('decision engine rejects high risk even with strong potential', () => {
   const result = evaluateOpportunity({
-    demandScore: 95,
-    sourcingScore: 95,
-    profitabilityScore: 95,
+    potentialScore: 95,
     confidence: 95,
     riskScore: 80,
   });
   assert.equal(result.decision, DECISIONS.REJECT);
 });
 
-test('decision engine rejects maximum risk even with maximum positive signals', () => {
+test('decision engine rejects maximum risk even with maximum potential', () => {
   const result = evaluateOpportunity({
-    demandScore: 100,
-    sourcingScore: 100,
-    profitabilityScore: 100,
+    potentialScore: 100,
     confidence: 100,
     riskScore: 100,
   });
   assert.equal(result.decision, DECISIONS.REJECT);
 });
 
-test('decision engine can recommend a test for a strong opportunity', () => {
+test('decision engine can recommend a test for a strong official potential score', () => {
   const result = evaluateOpportunity({
-    demandScore: 90,
-    sourcingScore: 92,
-    profitabilityScore: 90,
+    potentialScore: 90,
     confidence: 92,
     riskScore: 18,
   });
   assert.equal(result.decision, DECISIONS.TEST);
-  assert.ok(result.score >= 75);
+  assert.equal(result.potential, 90);
+  assert.equal('score' in result, false);
+});
+
+test('decision engine does not recompute a global score from component signals', () => {
+  const result = evaluateOpportunity({
+    potentialScore: 90,
+    demandScore: 0,
+    sourcingScore: 0,
+    profitabilityScore: 0,
+    confidence: 92,
+    riskScore: 18,
+  });
+  assert.equal(result.decision, DECISIONS.TEST);
+  assert.equal(result.potential, 90);
+  assert.equal('score' in result, false);
 });
