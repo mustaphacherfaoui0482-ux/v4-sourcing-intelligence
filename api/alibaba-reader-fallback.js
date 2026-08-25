@@ -98,11 +98,9 @@ export async function fetchAlibabaThroughReader(url) {
 
   const errors = [];
   const candidates = readerCandidates(normalized);
-  const preferPost = Boolean(process.env.JINA_API_KEY);
 
   for (const candidate of candidates) {
-    const methods = preferPost ? [fetchReaderPost, fetchReaderGet] : [fetchReaderGet, fetchReaderPost];
-    for (const method of methods) {
+    for (const method of [fetchReaderGet, fetchReaderPost]) {
       try {
         const result = await method(candidate);
         return { ...result, readerMode: process.env.JINA_API_KEY ? 'AUTHENTICATED_BROWSER_PROXY' : 'ANONYMOUS_READER' };
