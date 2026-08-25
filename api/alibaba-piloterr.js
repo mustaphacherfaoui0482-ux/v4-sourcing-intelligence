@@ -11,6 +11,53 @@ function getApiKey() {
   return raw.trim().split(/\s+/)[0] || null;
 }
 
+function isAlibabaShortProductUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)alibaba\.com$/i.test(parsed.hostname) && /^\/x\/[^/]+$/i.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function extractCanonicalProductUrl(html, baseUrl) {
+  const source = String(html || '');
+  const patterns = [
+    /<link[^>]+rel=["'][^"']*canonical[^"']*["'][^>]+href=["']([^"']+)["']/i,
+    /<link[^>]+href=["']([^"']+)["'][^>]+rel=["'][^"']*canonical[^"']*["']/i,
+    /<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:url["']/i,
+    /(https?:\/\/[^"'<>\s]+\.alibaba\.com\/product-detail\/[^"'<>\s]+?\.html(?:\?[^"'<>\s]+)?)/i,
+    /(\/product-detail\/[^"'<>\s]+?\.html(?:\?[^"'<>\s]+)?)/i,
+  ];
+  for (const pattern of patterns) {
+    const match = source.match(pattern);
+    if (!match?.[1]) continue;
+    try {
+      const candidate = new URL(match[1], baseUrl);
+      if (/alibaba\.com$/i.test(candidate.hostname) && /\/product-detail\//i.test(candidate.pathname)) return candidate.href;
+    } catch {}
+  }
+  return null;
+}
+
+async function resolvePiloterrUrl(url) {
+  if (!isAlibabaShortProductUrl(url)) return url;
+  const response = await fetch(url, {
+    method: 'GET',
+    redirect: 'follow',
+    signal: AbortSignal.timeout(8_000),
+    headers: {
+      accept: 'text/html,application/xhtml+xml',
+      'user-agent': 'Mozilla/5.0 (compatible; V4-Sourcing-Intelligence/1.0; +https://vercel.com)',
+    },
+  });
+  if (!response.ok) throw new Error(`alibaba_short_url_http_${response.status}`);
+  const canonical = extractCanonicalProductUrl(await response.text(), response.url || url);
+  if (!canonical) throw new Error('alibaba_short_url_canonical_not_found');
+  return canonical;
+}
+
 export function piloterrConfigured() {
   return Boolean(getApiKey());
 }
@@ -67,7 +114,8 @@ export async function fetchAlibabaThroughPiloterr(url, { search = false } = {}) 
   const key = getApiKey();
   if (!key) throw new Error('piloterr_not_configured');
   const endpoint = search ? SEARCH_ENDPOINT : PRODUCT_ENDPOINT;
-  const response = await fetch(`${endpoint}?query=${encodeURIComponent(url)}`, {
+  const targetUrl = search ? url : await resolvePiloterrUrl(url);
+  const response = await fetch(`${endpoint}?query=${encodeURIComponent(targetUrl)}`, {
     method: 'GET',
     redirect: 'follow',
     signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -101,7 +149,7 @@ export async function fetchAlibabaThroughPiloterr(url, { search = false } = {}) 
     contentType: 'application/json',
     acquisition: 'PILOTERR_BROWSER_API',
     acquisitionUrl: endpoint,
-    targetUrl: url,
+    targetUrl,
     extracted,
   };
 }
