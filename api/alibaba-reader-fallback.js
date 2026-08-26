@@ -47,6 +47,15 @@ function readerCandidates(normalized) {
       global.hostname = 'www.alibaba.com';
       candidates.push(global.href);
     }
+    const http = new URL(normalized);
+    http.protocol = 'http:';
+    candidates.push(http.href);
+    if (host.endsWith('.alibaba.com') && host !== 'www.alibaba.com') {
+      const globalHttp = new URL(url.href);
+      globalHttp.hostname = 'www.alibaba.com';
+      globalHttp.protocol = 'http:';
+      candidates.push(globalHttp.href);
+    }
   } catch {}
   return [...new Set(candidates)];
 }
