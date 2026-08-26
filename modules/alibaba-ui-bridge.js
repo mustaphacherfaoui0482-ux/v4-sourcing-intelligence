@@ -1,5 +1,6 @@
 import { renderAlibabaImport } from './alibaba-import.js';
 import { EMPTY_OPPORTUNITY, initDashboardRuntime } from './dashboard-runtime.js';
+import { mountManualCompletion } from './v4-manual-completion.js';
 
 function resetStaleEmptyOpportunity() {
   try {
@@ -98,6 +99,12 @@ function wireImportRuntimeSync() {
   document.addEventListener('v4:alibaba-evidence', (event) => {
     const opportunity = event.detail?.opportunity;
     initDashboardRuntime(opportunity || EMPTY_OPPORTUNITY);
+    if (opportunity) mountManualCompletion(opportunity);
+  });
+  document.addEventListener('v4:manual-completion', (event) => {
+    const opportunity = event.detail?.opportunity;
+    if (!opportunity) return;
+    initDashboardRuntime(opportunity);
   });
 }
 
