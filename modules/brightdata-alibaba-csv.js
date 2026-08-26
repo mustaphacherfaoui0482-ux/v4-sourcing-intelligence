@@ -77,49 +77,29 @@ export function parseBrightDataAlibabaCsv(csv) {
   const dataRows = rows.slice(1).map((cells, index) => {
     const record = Object.fromEntries(headers.map((header, column) => [header, cells[column] ?? '']));
     const evidence = {
-      sourceProvider: 'Bright Data',
-      sourceDataset: 'Alibaba',
-      sourceUrl: unwrapMarkdownLink(record.url),
-      itemId: cleanText(record.item_id) || null,
-      variantId: cleanText(record.variant_id) || null,
-      product: cleanText(record.title) || null,
-      description: cleanText(record.description) || null,
-      category: cleanText(record.product_category) || null,
-      categoryTree: parseJson(record.category_tree, null),
-      brand: cleanText(record.brand) || null,
-      imageUrl: unwrapMarkdownLink(record.image_url) || null,
-      displayedPrice: parseNumber(record.price),
-      salePrice: parseNumber(record.sale_price),
-      availability: cleanText(record.availability) || null,
-      availabilityDate: cleanText(record.availability_date) || null,
+      sourceProvider: 'Bright Data', sourceDataset: 'Alibaba', sourceUrl: unwrapMarkdownLink(record.url),
+      itemId: cleanText(record.item_id) || null, variantId: cleanText(record.variant_id) || null,
+      product: cleanText(record.title) || null, description: cleanText(record.description) || null,
+      category: cleanText(record.product_category) || null, categoryTree: parseJson(record.category_tree, null),
+      brand: cleanText(record.brand) || null, imageUrl: unwrapMarkdownLink(record.image_url) || null,
+      displayedPrice: parseNumber(record.price), salePrice: parseNumber(record.sale_price),
+      availability: cleanText(record.availability) || null, availabilityDate: cleanText(record.availability_date) || null,
       groupId: cleanText(record.group_id) || null,
       listingHasVariations: cleanText(record.listing_has_variations) === '' ? null : cleanText(record.listing_has_variations) === 'true',
-      variantAttributes: parseJson(record.variant_attributes, null),
-      variants: parseJson(record.variants, null),
-      supplier: cleanText(record.store_name) || null,
-      supplierUrl: unwrapMarkdownLink(record.seller_url) || null,
-      supplierCountry: cleanText(record.store_country) || null,
-      returnPolicy: unwrapMarkdownLink(record.return_policy) || null,
-      returnWindow: parseNumber(record.return_window),
-      targetCountries: parseJson(record.target_countries, null),
-      starRating: parseNumber(record.star_rating),
-      reviewCount: parseNumber(record.review_count),
-      reviews: parseJson(record.reviews, null),
-      additionalImageUrls: parseJson(record.additional_image_urls, null),
+      variantAttributes: parseJson(record.variant_attributes, null), variants: parseJson(record.variants, null),
+      supplier: cleanText(record.store_name) || null, supplierUrl: unwrapMarkdownLink(record.seller_url) || null,
+      supplierCountry: cleanText(record.store_country) || null, returnPolicy: unwrapMarkdownLink(record.return_policy) || null,
+      returnWindow: parseNumber(record.return_window), targetCountries: parseJson(record.target_countries, null),
+      starRating: parseNumber(record.star_rating), reviewCount: parseNumber(record.review_count),
+      reviews: parseJson(record.reviews, null), additionalImageUrls: parseJson(record.additional_image_urls, null),
       rowNumber: index + 2,
     };
-
     return { record, evidence, opportunity: buildAlibabaOpportunity(evidence) };
   });
 
-  return {
-    ok: true,
-    headers,
-    rowCount: dataRows.length,
+  return { ok: true, headers, rowCount: dataRows.length,
     validOpportunityCount: dataRows.filter((row) => row.opportunity !== null).length,
-    rows: dataRows,
-    opportunities: dataRows.flatMap((row) => row.opportunity ? [row.opportunity] : []),
-  };
+    rows: dataRows, opportunities: dataRows.flatMap((row) => row.opportunity ? [row.opportunity] : []) };
 }
 
 export function parseBrightDataAlibabaCsvRow(row) {
