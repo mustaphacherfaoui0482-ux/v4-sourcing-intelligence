@@ -12,6 +12,15 @@ function unwrapMarkdownLink(value) {
   return match ? match[2] : text;
 }
 
+function normalizeBrightDataValue(value) {
+  if (typeof value === 'string') return unwrapMarkdownLink(value);
+  if (Array.isArray(value)) return value.map(normalizeBrightDataValue);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, normalizeBrightDataValue(item)]));
+  }
+  return value;
+}
+
 function parseNumber(value) {
   const text = cleanText(value);
   if (!text) return null;
@@ -23,7 +32,7 @@ function parseNumber(value) {
 function parseJson(value, fallback = null) {
   const text = cleanText(value);
   if (!text) return fallback;
-  try { return JSON.parse(text); } catch { return fallback; }
+  try { return normalizeBrightDataValue(JSON.parse(text)); } catch { return fallback; }
 }
 
 function parseCsvRows(csv) {
