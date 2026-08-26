@@ -13,9 +13,14 @@ export function buildAlibabaOpportunity(evidence = {}) {
   );
 
   const displayedPrice = knownNumber(evidence.displayedPrice);
+  const itemId = String(evidence.itemId ?? '').trim() || null;
+  const variantId = String(evidence.variantId ?? '').trim() || null;
+  const stableIdentity = itemId
+    ? `alibaba-${itemId}${variantId ? `-${variantId}` : ''}`
+    : null;
 
   return Object.freeze({
-    id: `alibaba-${Date.now()}`,
+    id: stableIdentity || `alibaba-${product}`,
     product,
     source: 'Alibaba.com',
     country: evidence.supplierCountry || '—',
