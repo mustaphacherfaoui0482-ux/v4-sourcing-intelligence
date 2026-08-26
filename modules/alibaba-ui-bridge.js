@@ -93,18 +93,26 @@ function wireRadarNavigation() {
   }, true);
 }
 
+function remountCompletion(opportunity) {
+  if (!opportunity || opportunity.product === 'Aucune opportunité active') return;
+  // initDashboardRuntime may rebuild dashboard DOM. Mount completion on the next frame
+  // so it survives that render and retains the just-saved values from localStorage.
+  window.requestAnimationFrame(() => mountManualCompletion(opportunity));
+}
+
 function wireImportRuntimeSync() {
   if (document.documentElement.dataset.v4AlibabaRuntimeSync === 'ready') return;
   document.documentElement.dataset.v4AlibabaRuntimeSync = 'ready';
   document.addEventListener('v4:alibaba-evidence', (event) => {
     const opportunity = event.detail?.opportunity;
     initDashboardRuntime(opportunity || EMPTY_OPPORTUNITY);
-    if (opportunity) mountManualCompletion(opportunity);
+    remountCompletion(opportunity);
   });
   document.addEventListener('v4:manual-completion', (event) => {
     const opportunity = event.detail?.opportunity;
     if (!opportunity) return;
     initDashboardRuntime(opportunity);
+    remountCompletion(opportunity);
   });
 }
 
