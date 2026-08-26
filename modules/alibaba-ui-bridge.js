@@ -99,18 +99,34 @@ function remountCompletion(opportunity) {
   window.requestAnimationFrame(() => mountManualCompletion(opportunity));
 }
 
+function restoreAlibabaTable() {
+  try {
+    renderAlibabaImport(document);
+  } catch (error) {
+    console.error('[V4 Alibaba] table restore failed', error);
+  }
+}
+
+function refreshAlibabaTableAfterDashboardRender() {
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => restoreAlibabaTable());
+  });
+}
+
 function wireImportRuntimeSync() {
   if (document.documentElement.dataset.v4AlibabaRuntimeSync === 'ready') return;
   document.documentElement.dataset.v4AlibabaRuntimeSync = 'ready';
   document.addEventListener('v4:alibaba-evidence', (event) => {
     const opportunity = event.detail?.opportunity;
     initDashboardRuntime(opportunity || EMPTY_OPPORTUNITY);
+    refreshAlibabaTableAfterDashboardRender();
     remountCompletion(opportunity);
   });
   document.addEventListener('v4:manual-completion', (event) => {
     const opportunity = event.detail?.opportunity;
     if (!opportunity) return;
     initDashboardRuntime(opportunity);
+    refreshAlibabaTableAfterDashboardRender();
     remountCompletion(opportunity);
   });
 }
@@ -123,6 +139,7 @@ function boot() {
   wireImportRuntimeSync();
   if (document.documentElement.dataset.v4Runtime === 'ready' && !window.V4SourcingRuntime?.isDemo && window.V4SourcingRuntime?.opportunity?.product === 'Aucune opportunité active') {
     initDashboardRuntime(EMPTY_OPPORTUNITY);
+    refreshAlibabaTableAfterDashboardRender();
   }
 }
 
