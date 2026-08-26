@@ -5,6 +5,7 @@ const DB_NAME = 'v4-sourcing-intelligence';
 const DB_VERSION = 1;
 const STORE = 'alibaba-csv-batch';
 const PAGE_SIZE = 25;
+let importing = false;
 
 function openDb() {
   return new Promise((resolve, reject) => {
@@ -52,7 +53,7 @@ function renderBatch(output, batch) {
       </div>
       <div class="diagnostic" style="margin-top:10px">
         <b>${batch.importedRows} produits réellement chargés dans V4</b><br>
-        <span class="sub">Le navigateur ne tente plus de mettre les 1 000 produits dans localStorage. Les données sont conservées dans IndexedDB et consultables par pages.</span>
+        <span class="sub">Les produits sont conservés dans IndexedDB et consultables par pages.</span>
       </div>
       <div style="overflow:auto;margin-top:10px">
         <table class="table"><thead><tr><th>#</th><th>Produit</th><th>Prix</th><th>Fournisseur</th><th>URL</th></tr></thead>
@@ -70,11 +71,15 @@ function renderBatch(output, batch) {
 }
 
 async function importBatch(file, section) {
+  if (importing) return;
+  importing = true;
   const status = section.querySelector('[data-v4-alibaba-status]');
   const output = section.querySelector('[data-v4-alibaba-evidence]');
   const form = section.querySelector('[data-v4-alibaba-form]');
+  const button = section.querySelector('[data-alibaba-csv-import]');
+  if (button) button.disabled = true;
   status.textContent = 'Statut : lecture du CSV…';
-  output.innerHTML = '<div class="diagnostic">Analyse complète du fichier en cours…</div>';
+  output.innerHTML = '<div class="diagnostic">Analyse du fichier en cours…</div>';
 
   try {
     const text = await file.text();
@@ -107,10 +112,15 @@ async function importBatch(file, section) {
   } catch (error) {
     status.textContent = 'Statut : import CSV échoué';
     output.innerHTML = `<div class="diagnostic">${escapeHtml(error?.message || 'CSV invalide')}</div>`;
+  } finally {
+    importing = false;
+    if (button) button.disabled = false;
   }
 }
 
 function install() {
+  if (document.documentElement.dataset.v4AlibabaCsvBatchRuntime === 'ready') return;
+  document.documentElement.dataset.v4AlibabaCsvBatchRuntime = 'ready';
   document.addEventListener('click', (event) => {
     const button = event.target?.closest?.('[data-alibaba-csv-import]');
     if (!button) return;
@@ -123,7 +133,7 @@ function install() {
       const status = section?.querySelector('[data-v4-alibaba-status]');
       const output = section?.querySelector('[data-v4-alibaba-evidence]');
       if (status) status.textContent = 'Statut : sélectionnez d’abord un fichier CSV';
-      if (output) output.innerHTML = '<div class="diagnostic">Choisissez le fichier téléchargé depuis Bright Data.</div>';
+      if (output) output.innerHTML = '<div class="diagnostic">Choisissez le fichier CSV téléchargé depuis Bright Data.</div>';
       return;
     }
     importBatch(file, section);
