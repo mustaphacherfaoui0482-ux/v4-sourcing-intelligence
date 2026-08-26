@@ -1,13 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFile } from 'node:fs/promises';
 
-const bridge = await import('../modules/alibaba-ui-bridge.js').catch(() => null);
-
-test('manual completion bridge module remains importable', () => {
-  assert.ok(bridge || true);
-});
+const source = await readFile(new URL('../modules/alibaba-ui-bridge.js', import.meta.url), 'utf8');
 
 test('completion remount strategy uses a next-frame render after runtime sync', () => {
-  const source = await import('node:fs/promises').then((fs) => fs.readFile('modules/alibaba-ui-bridge.js', 'utf8'));
   assert.match(source, /requestAnimationFrame\(\(\) => mountManualCompletion\(opportunity\)\)/);
+  assert.match(source, /function remountCompletion\(opportunity\)/);
 });
