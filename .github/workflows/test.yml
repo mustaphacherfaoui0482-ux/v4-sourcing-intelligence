@@ -38,9 +38,15 @@ jobs:
         run: npm test
 
       - name: Run Webstractor provider test
-        env:
-          RUN_REAL_PROVIDER_TEST: '1'
-        run: node --test tests/webstractor-provider.test.mjs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${WEBSTRACTOR_API_KEY:-}" ]; then
+            echo "REAL_PROVIDER_TEST=NOT_RUN (WEBSTRACTOR_API_KEY not configured)"
+            exit 0
+          fi
+          export RUN_REAL_PROVIDER_TEST=1
+          node --test tests/webstractor-provider.test.mjs
 
   deploy:
     needs: test
