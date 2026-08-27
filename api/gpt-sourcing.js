@@ -34,8 +34,32 @@ export function runV4Decision(candidate) { return evaluateOpportunity(candidate 
 export function isTerminalDecision(decision) { return TERMINAL_DECISIONS.has(decision); }
 export function isGptDecisionAllowed(v4Decision, gptDecision) { if (!v4Decision) return true; if (isTerminalDecision(v4Decision.decision)) return false; const allowed = V4_NON_TERMINAL_ALLOWED[v4Decision.decision]; return allowed ? allowed.has(gptDecision) : gptDecision === 'STOP'; }
 function extractResponseText(payload) { if (typeof payload?.output_text === 'string' && payload.output_text.trim()) return payload.output_text; for (const item of Array.isArray(payload?.output) ? payload.output : []) for (const part of Array.isArray(item?.content) ? item.content : []) if (typeof part?.text === 'string' && part.text.trim()) return part.text; return null; }
-function requestOrigin(req) { const forwardedProto = String(req.headers?.['x-forwarded-proto'] || '').split(',')[0].trim(); const protocol = forwardedProto || 'https'; const host = req.headers?.host || process.env.VERCEL_URL; return host ? `${protocol}://${host}` : null; }
-async function callSourceEndpoint(req, sourceId, url) { const source = resolveSource(sourceId); if (source.status !== 'AVAILABLE') return { ok: false, status: source.status, sourceId }; if (source.adapter !== 'alibaba-import') return { ok: false, status: 'UNSUPPORTED_ADAPTER', sourceId }; const origin = requestOrigin(req); if (!origin) return { ok: false, status: 'TOOL_UNAVAILABLE', error: 'request_origin_unavailable' }; try { const response = await fetch(`${origin}/api/alibaba-import`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url }), signal: AbortSignal.timeout(12_000) }); const payload = await response.json().catch(() => null); if (!response.ok || !payload) return { ok: false, status: 'TOOL_ERROR', httpStatus: response.status, error: payload?.error || 'source_endpoint_failed', providerError: payload?.providerError || null, directError: payload?.directError || null }; return payload; } catch (error) { return { ok: false, status: 'TOOL_ERROR', error: error instanceof Error ? error.message : 'source_endpoint_failed' }; } }
+async function callSourceEndpoint(req, sourceId, url) {
+  const source = resolveSource(sourceId);
+  if (source.status !== 'AVAILABLE') return { ok: false, status: source.status, sourceId };
+  if (source.adapter !== 'alibaba-import') return { ok: false, status: 'UNSUPPORTED_ADAPTER', sourceId };
+  try {
+    const payload = await fetchAlibabaThroughPiloterr(url, { search: false });
+    return {
+      ok: true,
+      status: payload.extracted?.parserStatus || 'EXTRACTED',
+      sourceUrl: payload.targetUrl || url,
+      acquisition: payload.acquisition || 'PILOTERR_BROWSER_API',
+      acquisitionUrl: payload.acquisitionUrl || 'https://api.piloterr.com/v2/alibaba/product',
+      extractionStatus: payload.extracted?.parserStatus || 'PARTIAL_OR_COMPLETE',
+      evidenceStatus: 'EXTRACTED',
+      extracted: payload.extracted || null,
+      providerConfigured: true,
+      error: null,
+      providerError: null,
+      directError: null,
+      readerDiagnostics: null,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'piloterr_failed';
+    return { ok: false, status: 'TOOL_ERROR', sourceUrl: url, error: message, providerError: message, directError: null, providerConfigured: true };
+  }
+}
 export async function executeSourcingTool(name, args, req) {
   if (name === 'list_sources') return { ok: true, sources: listSourcingSources() };
   if (name === 'search_source') {
@@ -51,7 +75,7 @@ export async function executeSourcingTool(name, args, req) {
     }
   }
   if (name === 'inspect_source_product') {
-    const source = String(args?.source || '').trim().toLowerCase(); const url = typeof args?.url === 'string' ? args.url.trim() : ''; if (!source) return { ok: false, status: 'INVALID_ARGUMENT', error: 'source_required' }; if (!url) return { ok: false, status: 'INVALID_ARGUMENT', error: 'url_required' }; const sourceState = resolveSource(source); if (sourceState.status !== 'AVAILABLE') return sourceState; if (source !== 'alibaba' || !/^https:\/\/(?:[^/]+\.)?alibaba\.com\//i.test(url)) return { ok: false, status: 'INVALID_ARGUMENT', error: 'unsupported_source_url' }; const payload = await callSourceEndpoint(req, source, url); return { ok: Boolean(payload.ok), source, status: payload.acquisitionStatus || payload.extractionStatus || payload.status || 'UNKNOWN', sourceUrl: payload.sourceUrl || url, acquisition: payload.acquisition || null, acquisitionUrl: payload.acquisitionUrl || url, extractionStatus: payload.extractionStatus || 'UNKNOWN', evidenceStatus: payload.evidenceStatus || 'UNKNOWN', extracted: payload.extracted || { product: null, displayedPrice: null, moq: null, supplier: null, supplierCountry: null }, error: payload.error || null, directError: payload.directError || null, providerError: payload.providerError || null, providerConfigured: payload.providerConfigured ?? null, readerDiagnostics: payload.readerDiagnostics || null };
+    const source = String(args?.source || '').trim().toLowerCase(); const url = typeof args?.url === 'string' ? args.url.trim() : ''; if (!source) return { ok: false, status: 'INVALID_ARGUMENT', error: 'source_required' }; if (!url) return { ok: false, status: 'INVALID_ARGUMENT', error: 'url_required' }; const sourceState = resolveSource(source); if (sourceState.status !== 'AVAILABLE') return sourceState; if (source !== 'alibaba' || !/^https:\/\/(?:[^/]+\.)?alibaba\.com\//i.test(url)) return { ok: false, status: 'INVALID_ARGUMENT', error: 'unsupported_source_url' }; const payload = await callSourceEndpoint(req, source, url); return { ok: Boolean(payload.ok), source, status: payload.extractionStatus || payload.status || 'UNKNOWN', sourceUrl: payload.sourceUrl || url, acquisition: payload.acquisition || null, acquisitionUrl: payload.acquisitionUrl || url, extractionStatus: payload.extractionStatus || 'UNKNOWN', evidenceStatus: payload.evidenceStatus || 'UNKNOWN', extracted: payload.extracted || { product: null, displayedPrice: null, moq: null, supplier: null, supplierCountry: null }, error: payload.error || null, directError: payload.directError || null, providerError: payload.providerError || null, providerConfigured: payload.providerConfigured ?? null, readerDiagnostics: payload.readerDiagnostics || null };
   }
   throw new Error(`Unknown sourcing tool: ${name}`);
 }
