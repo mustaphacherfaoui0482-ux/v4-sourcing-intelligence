@@ -28,9 +28,10 @@ Connect GPT to V4 as a sourcing orchestrator without rebuilding V4 or creating a
 - Product inspection accepts only Alibaba HTTPS URLs before acquisition.
 
 ## TEST EVIDENCE
-- Vercel build for the first Alibaba search-tool implementation completed successfully.
-- That build observed 95 tests passing and 0 failing.
-- The inspection-tool and prompt updates are now committed and awaiting their own deployment verification.
+- Latest Vercel deployment for the tool/prompt stage is READY.
+- Latest Vercel build observed 100 tests passing and 0 failing.
+- The previous inspection-tool deployment failure was isolated to a stale test expectation (`2 !== 1`) and was corrected; the next build passed.
+- The dashboard production page responds HTTP 200 on the latest deployment.
 - The current session has not executed a live GPT POST workflow because an authenticated POST invocation of the protected deployment is not available through the connected Vercel fetch interface.
 - Repository-wide GitHub Actions CI execution is still not observed from this session.
 
@@ -38,4 +39,4 @@ Connect GPT to V4 as a sourcing orchestrator without rebuilding V4 or creating a
 Obtain live end-to-end evidence: GPT → `search_alibaba` → `inspect_alibaba_product` → observed candidate data → V4 decision authority.
 
 ## NEXT ACTION
-Deploy the inspection stage, verify the expanded test suite, then execute a bounded live workflow if OpenAI credentials and authenticated POST execution are available.
+Execute a bounded live workflow when authenticated POST execution and OpenAI credentials are available. Do not treat the POC as end-to-end validated until that observation exists.
