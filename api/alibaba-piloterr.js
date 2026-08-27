@@ -85,16 +85,39 @@ export function normalizePiloterrProduct(payload = {}) {
   });
 }
 
+function parseEmbeddedJson(value) {
+  if (typeof value !== 'string') return value;
+  const raw = value.trim();
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+function unwrapSearchPayload(payload = {}) {
+  let current = payload;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (!current || typeof current !== 'object') break;
+    if (Array.isArray(current.results) || Array.isArray(current.items) || Array.isArray(current.products)) return current;
+    const next = current.result ?? current.data;
+    if (next == null || next === current) break;
+    const parsed = parseEmbeddedJson(next);
+    if (parsed == null || parsed === current) break;
+    current = parsed;
+  }
+  return current;
+}
+
 function searchItems(payload = {}) {
-  const candidates = payload?.results || payload?.items || payload?.data?.results || payload?.data?.items || payload?.products || payload?.result?.items || [];
+  const root = unwrapSearchPayload(payload);
+  const candidates = root?.results || root?.items || root?.data?.results || root?.data?.items || root?.products || root?.result?.items || [];
   return Array.isArray(candidates) ? candidates : [];
 }
 
 function normalizePiloterrSearch(payload = {}) {
-  const candidates = searchItems(payload).map((item) => ({
+  const root = unwrapSearchPayload(payload);
+  const candidates = searchItems(root).map((item) => ({
     url: firstNonEmpty(item?.listing_url, item?.url, item?.product_url),
     productId: firstNonEmpty(item?.product_id, item?.id),
-    title: firstNonEmpty(item?.title, item?.name),
+    title: firstNonEmpty(item?.title, item?.name, item?.puretitle),
     displayedPrice: firstNonEmpty(item?.price_min, item?.price?.min, item?.price?.display, item?.price_text, item?.price, item?.price_usd),
     priceMax: firstNonEmpty(item?.price_max, item?.price?.max),
     moq: firstNonEmpty(item?.min_order, item?.moq, item?.minimum_order_quantity, item?.min_order_quantity, item?.price?.quantity_prices?.[0]?.min_quantity),
@@ -104,10 +127,10 @@ function normalizePiloterrSearch(payload = {}) {
 
   return Object.freeze({
     candidates,
-    total: firstNonEmpty(payload?.total_results, payload?.total, payload?.pagination?.total, payload?.count),
-    page: firstNonEmpty(payload?.page, payload?.pagination?.page),
-    pages: firstNonEmpty(payload?.total_pages, payload?.pages, payload?.pagination?.pages),
-    next: payload?.next ?? null,
+    total: firstNonEmpty(root?.total_results, root?.total, root?.pagination?.total, root?.count),
+    page: firstNonEmpty(root?.page, root?.pagination?.page),
+    pages: firstNonEmpty(root?.total_pages, root?.pages, root?.pagination?.pages),
+    next: root?.next ?? null,
     providerPayload: payload,
   });
 }
