@@ -48,8 +48,14 @@ test('agent stops at maximum step budget', () => {
 });
 
 test('agent output accepts only V4 decisions', () => {
-  assert.equal(validateAgentOutput({ decision: 'ATTENDRE' }).decision, 'ATTENDRE');
-  assert.throws(() => validateAgentOutput({ decision: 'MAYBE' }));
+  const valid = {
+    reason: 'données insuffisantes',
+    nextAction: 'collecter la preuve manquante',
+    evidenceStatus: 'P1',
+    gap: null,
+  };
+  assert.equal(validateAgentOutput({ ...valid, decision: 'ATTENDRE' }).decision, 'ATTENDRE');
+  assert.throws(() => validateAgentOutput({ ...valid, decision: 'MAYBE' }));
 });
 
 test('explicit STOP records reason and evidence', () => {
