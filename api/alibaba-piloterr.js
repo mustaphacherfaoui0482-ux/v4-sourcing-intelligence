@@ -135,12 +135,23 @@ function normalizePiloterrSearch(payload = {}) {
   });
 }
 
+function extractSearchQuery(url) {
+  try {
+    const parsed = new URL(url);
+    const query = parsed.searchParams.get('SearchText') || parsed.searchParams.get('searchText') || parsed.searchParams.get('query');
+    return query?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchAlibabaThroughPiloterr(url, { search = false } = {}) {
   const key = getApiKey();
   if (!key) throw new Error('piloterr_not_configured');
   const endpoint = search ? SEARCH_ENDPOINT : PRODUCT_ENDPOINT;
   const targetUrl = search ? url : await resolvePiloterrUrl(url);
-  const response = await fetch(`${endpoint}?query=${encodeURIComponent(targetUrl)}`, {
+  const query = search ? (extractSearchQuery(url) || url) : targetUrl;
+  const response = await fetch(`${endpoint}?query=${encodeURIComponent(query)}`, {
     method: 'GET',
     redirect: 'follow',
     signal: AbortSignal.timeout(TIMEOUT_MS),
