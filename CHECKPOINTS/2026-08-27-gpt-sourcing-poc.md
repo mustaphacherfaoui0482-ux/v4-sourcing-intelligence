@@ -1,15 +1,18 @@
 # CHECKPOINT — GPT SOURCING × V4 POC
 
 Date: 2026-08-27
-Version: GPT Sourcing Agent 0.1.0
+Version: GPT Sourcing Agent 1.1.0
 
 ## TARGET
 Connect GPT to V4 as a sourcing orchestrator without rebuilding V4 or creating a second business-decision engine.
 
 ## IMPLEMENTED
 - `modules/gpt-sourcing-agent.js`: provider-agnostic bounded state machine.
-- `api/gpt-sourcing.js`: Vercel-compatible HTTP endpoint with OpenAI Responses API integration and deterministic V4 decision evaluation.
+- `api/gpt-sourcing.js`: Vercel-compatible HTTP endpoint with OpenAI Responses API integration, deterministic V4 decision evaluation and function-tool orchestration.
+- `modules/gpt-sourcing-prompt.js`: tool-aware sourcing prompt v1.1.0.
 - `tests/gpt-sourcing-agent.test.mjs`: anti-loop, step-budget, state and output validation tests.
+- `tests/gpt-sourcing-tools.test.mjs`: strict Alibaba search-tool contract tests.
+- `search_alibaba`: first real sourcing/search tool exposed to GPT, backed by the existing Alibaba acquisition/extraction pipeline.
 
 ## GUARANTEES IN POC
 - V4 remains authoritative for deterministic opportunity decisions.
@@ -19,16 +22,18 @@ Connect GPT to V4 as a sourcing orchestrator without rebuilding V4 or creating a
 - Maximum agent-step budget is 8.
 - Explicit STOP states exist for loop detection and step exhaustion.
 - Missing OpenAI credentials do not fake a GPT result; endpoint returns `NOT_CONFIGURED`.
-
-## LIMITATIONS
-- This is a POC, not yet a complete autonomous sourcing agent.
-- External source-search tools are not yet exposed to GPT.
-- Persistent workflow storage is not yet implemented.
-- OpenAI API execution requires `OPENAI_API_KEY` and an explicit `OPENAI_MODEL` environment variable.
-- Repository CI execution has not yet been observed from this session.
+- Alibaba search output is treated as observation/evidence input; missing fields remain UNKNOWN/NULL.
+- The search tool is bounded to Alibaba and limits returned candidate URLs to at most 10.
 
 ## TEST EVIDENCE
-The six new state-machine tests were reproduced locally with Node.js and all passed. Repository-wide CI has NOT been claimed as passed.
+- Vercel build for the Alibaba search-tool commit completed successfully.
+- Build output observed 95 tests passing and 0 failing.
+- Vercel deployment status is successful.
+- The current session has not executed a live GPT POST workflow because an authenticated POST invocation of the protected deployment is not available through the connected Vercel fetch interface.
+- Repository-wide GitHub Actions CI execution is still not observed from this session.
 
-## NEXT GAP
-Expose the first real sourcing/search tool to the GPT orchestrator, then test one complete product workflow end-to-end.
+## CURRENT GAP
+Run one complete end-to-end sourcing workflow with the live GPT endpoint: GPT → `search_alibaba` → observed candidates → next evidence action → V4 decision authority.
+
+## NEXT ACTION
+Add the minimum product-inspection capability required after search, then run a bounded end-to-end workflow against a real Alibaba candidate without inventing missing economics or evidence.
