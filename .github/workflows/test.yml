@@ -19,8 +19,6 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      WEBSTRACTOR_API_KEY: ${{ secrets.WEBSTRACTOR_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,6 +37,8 @@ jobs:
 
       - name: Run Webstractor provider test
         shell: bash
+        env:
+          WEBSTRACTOR_API_KEY: ${{ secrets.WEBSTRACTOR_API_KEY }}
         run: |
           set -euo pipefail
           if [ -z "${WEBSTRACTOR_API_KEY:-}" ]; then
@@ -78,17 +78,15 @@ jobs:
           grep -q "V4 SOURCING INTELLIGENCE" index.html
           grep -q "CONTROL CENTER" index.html
           grep -q "dashboard-runtime.js" index.html
-          echo "RELEASE_SHA=$(git rev-parse HEAD)"
-          echo "GitHub Pages payload verified"
 
-      - name: Configure GitHub Pages
+      - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload exact repository payload
-        uses: actions/upload-pages-artifact@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
           path: .
 
-      - name: Deploy exact payload to GitHub Pages
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
