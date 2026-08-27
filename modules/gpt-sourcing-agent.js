@@ -1,11 +1,13 @@
 /**
- * GPT Sourcing Agent — V4 orchestration core v1.0
+ * GPT Sourcing Agent — V4 orchestration core v1.1
  *
  * Provider-agnostic workflow state. V4 remains authoritative for
  * deterministic business decisions.
  */
 
-export const GPT_SOURCING_VERSION = '1.0.0';
+import { normalizeSourceProduct } from './source-adapter.js';
+
+export const GPT_SOURCING_VERSION = '1.1.0';
 export const MAX_AGENT_STEPS = 8;
 
 export const STATES = Object.freeze([
@@ -140,6 +142,45 @@ export function completeState(state, result = null) {
   state.nextAllowedAction = 'STOP';
   state.lastResult = { type: 'COMPLETED', result };
   return state;
+}
+
+/**
+ * Execute one provider search through the source adapter.
+ * The agent records the action and returns raw provider results only.
+ * No economics, risk, score, or decision is calculated here.
+ */
+export async function executeSourceSearch(state, adapter, source, query) {
+  const action = { action: 'search_source', source, query };
+  recordAction(state, action);
+  if (state.status !== 'RUNNING') return { state, results: null };
+
+  const results = await adapter.searchSource(source, query);
+  state.actual = results;
+  state.lastResult = { type: 'SOURCE_SEARCH', source, query, resultCount: Array.isArray(results) ? results.length : null };
+  state.nextAllowedAction = 'INSPECT_SOURCE_PRODUCT';
+  return { state, results };
+}
+
+/**
+ * Inspect one provider product and normalize it into the Evidence boundary.
+ */
+export async function executeSourceInspection(
+  state,
+  adapter,
+  source,
+  reference,
+  { evidenceStatus = 'P1', observedAt = null } = {},
+) {
+  const action = { action: 'inspect_source_product', source, url: reference };
+  recordAction(state, action);
+  if (state.status !== 'RUNNING') return { state, evidence: null };
+
+  const raw = await adapter.inspectSourceProduct(source, reference);
+  const evidence = normalizeSourceProduct(raw, { source, evidenceStatus, observedAt });
+  state.actual = evidence;
+  state.lastResult = { type: 'SOURCE_INSPECTION', source, reference, evidence };
+  state.nextAllowedAction = 'NEXT_STATE';
+  return { state, evidence };
 }
 
 export function buildAgentContext(state) {
