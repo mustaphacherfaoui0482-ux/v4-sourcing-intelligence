@@ -35,6 +35,13 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Run real Webstractor provider test
+        if: ${{ secrets.WEBSTRACTOR_API_KEY != '' }}
+        env:
+          WEBSTRACTOR_API_KEY: ${{ secrets.WEBSTRACTOR_API_KEY }}
+          RUN_REAL_PROVIDER_TEST: '1'
+        run: node --test tests/webstractor-provider.test.mjs
+
   deploy:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
