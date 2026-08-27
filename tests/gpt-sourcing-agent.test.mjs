@@ -6,10 +6,13 @@ import {
   buildAgentContext,
   closeGap,
   createSourcingState,
+  executeSourceInspection,
+  executeSourceSearch,
   recordAction,
   stopState,
   validateAgentOutput,
 } from '../modules/gpt-sourcing-agent.js';
+import { createSourceAdapter } from '../modules/source-adapter.js';
 
 test('GPT sourcing state preserves unknown gaps and exposes next action', () => {
   const state = createSourcingState({ target: 'Tester un produit' });
@@ -63,4 +66,38 @@ test('explicit STOP records reason and evidence', () => {
   stopState(state, 'BLOCKED', { field: 'price', value: null });
   assert.equal(state.status, 'STOP');
   assert.equal(state.lastResult.reason, 'BLOCKED');
+});
+
+test('GPT agent executes source search then inspection into V4 evidence boundary', async () => {
+  const adapter = createSourceAdapter({
+    demo: {
+      search: async (query) => [{ product: query, reference: 'demo-1' }],
+      inspectProduct: async () => ({
+        product: 'Thermal camera',
+        supplier: 'Demo Supplier',
+        price: 42,
+        currency: 'USD',
+        moq: undefined,
+        url: 'https://example.test/demo-1',
+      }),
+    },
+  });
+
+  const state = createSourcingState({ target: 'Trouver une caméra thermique' });
+  const searched = await executeSourceSearch(state, adapter, 'demo', 'smartphone thermal camera');
+  assert.equal(searched.results[0].reference, 'demo-1');
+  assert.equal(state.nextAllowedAction, 'INSPECT_SOURCE_PRODUCT');
+
+  const inspected = await executeSourceInspection(state, adapter, 'demo', 'demo-1', {
+    evidenceStatus: 'P2',
+    observedAt: '2026-08-27T00:00:00Z',
+  });
+
+  assert.equal(inspected.evidence.product.value, 'Thermal camera');
+  assert.equal(inspected.evidence.price.value, 42);
+  assert.equal(inspected.evidence.moq.value, null);
+  assert.equal(inspected.evidence.moq.evidenceStatus, 'P2');
+  assert.equal(inspected.evidence.supplier.source, 'demo');
+  assert.equal(state.lastResult.type, 'SOURCE_INSPECTION');
+  assert.equal(state.stepCount, 2);
 });
