@@ -24,6 +24,32 @@ const OUTPUT_SCHEMA = {
   required: ['decision', 'reason', 'nextAction', 'evidenceStatus', 'gap'],
 };
 
+export const SOURCING_TOOLS = Object.freeze([
+  {
+    type: 'function',
+    name: 'search_alibaba',
+    description: 'Search Alibaba product listings for sourcing research. Returns only observed candidate URLs and acquisition/extraction status. Do not infer price, MOQ, supplier, demand, margin, or risk when the tool does not provide them.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Product or sourcing query, for example smartphone thermal camera.',
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 10,
+          description: 'Maximum number of candidate product URLs to return.',
+        },
+      },
+      required: ['query', 'limit'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+]);
+
 const TERMINAL_DECISIONS = new Set(['TESTER', 'EVITER']);
 const V4_NON_TERMINAL_ALLOWED = {
   APPROFONDIR: new Set(['APPROFONDIR', 'ATTENDRE', 'STOP']),
@@ -64,7 +90,52 @@ function extractResponseText(payload) {
   return null;
 }
 
-async function callOpenAI({ target, candidate, state, model }) {
+function requestOrigin(req) {
+  const forwardedProto = String(req.headers?.['x-forwarded-proto'] || '').split(',')[0].trim();
+  const protocol = forwardedProto || 'https';
+  const host = req.headers?.host || process.env.VERCEL_URL;
+  return host ? `${protocol}://${host}` : null;
+}
+
+export async function executeSourcingTool(name, args, req) {
+  if (name !== 'search_alibaba') throw new Error(`Unknown sourcing tool: ${name}`);
+
+  const query = typeof args?.query === 'string' ? args.query.trim() : '';
+  const limit = Number.isInteger(args?.limit) ? Math.min(Math.max(args.limit, 1), 10) : 5;
+  if (!query) return { ok: false, status: 'INVALID_ARGUMENT', error: 'query_required' };
+
+  const origin = requestOrigin(req);
+  if (!origin) return { ok: false, status: 'TOOL_UNAVAILABLE', error: 'request_origin_unavailable' };
+
+  const searchUrl = `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(query)}`;
+  const response = await fetch(`${origin}/api/alibaba-import`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ url: searchUrl }),
+    signal: AbortSignal.timeout(12_000),
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok || !payload) {
+    return { ok: false, status: 'TOOL_ERROR', httpStatus: response.status, error: 'alibaba_search_failed' };
+  }
+
+  return {
+    ok: Boolean(payload.ok),
+    status: payload.acquisitionStatus || payload.extractionStatus || 'UNKNOWN',
+    source: payload.source || 'Alibaba.com',
+    sourceUrl: payload.sourceUrl || searchUrl,
+    evidenceStatus: payload.evidenceStatus || 'UNKNOWN',
+    productCandidates: Array.isArray(payload.productCandidates) ? payload.productCandidates.slice(0, limit) : [],
+    acquisition: payload.acquisition || null,
+    providerConfigured: payload.providerConfigured ?? null,
+    directError: payload.directError || null,
+    providerError: payload.providerError || null,
+    readerDiagnostics: payload.readerDiagnostics || null,
+  };
+}
+
+async function callOpenAI({ target, candidate, state, model, req }) {
   const apiKey = process.env.OPENAI_API_KEY;
   const selectedModel = model || process.env.OPENAI_MODEL;
   if (!apiKey || !selectedModel) {
@@ -76,65 +147,119 @@ async function callOpenAI({ target, candidate, state, model }) {
     };
   }
 
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: selectedModel,
-      input: [
-        { role: 'system', content: GPT_SOURCING_SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: JSON.stringify({
-            target,
-            candidate,
-            v4State: buildAgentContext(state),
-          }),
-        },
-      ],
-      text: {
-        format: {
-          type: 'json_schema',
-          name: 'v4_sourcing_decision',
-          strict: true,
-          schema: OUTPUT_SCHEMA,
-        },
-      },
+  const input = [{
+    role: 'user',
+    content: JSON.stringify({
+      target,
+      candidate,
+      v4State: buildAgentContext(state),
     }),
-  });
+  }];
 
-  const payload = await response.json();
-  if (!response.ok) {
-    const error = payload?.error?.message || `OpenAI HTTP ${response.status}`;
-    return { status: 'OPENAI_ERROR', error, httpStatus: response.status };
+  let lastResponse = null;
+  const toolTrace = [];
+
+  for (let iteration = 0; iteration < 8; iteration += 1) {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: selectedModel,
+        instructions: GPT_SOURCING_SYSTEM_PROMPT,
+        input,
+        tools: SOURCING_TOOLS,
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'v4_sourcing_decision',
+            strict: true,
+            schema: OUTPUT_SCHEMA,
+          },
+        },
+      }),
+    });
+
+    const payload = await response.json();
+    if (!response.ok) {
+      const error = payload?.error?.message || `OpenAI HTTP ${response.status}`;
+      return { status: 'OPENAI_ERROR', error, httpStatus: response.status, toolTrace };
+    }
+
+    lastResponse = payload;
+    const output = Array.isArray(payload?.output) ? payload.output : [];
+    input.push(...output);
+
+    const functionCalls = output.filter((item) => item?.type === 'function_call');
+    if (!functionCalls.length) {
+      const outputText = extractResponseText(payload);
+      if (!outputText) return { status: 'OPENAI_EMPTY', responseId: payload?.id, toolTrace };
+
+      let parsed;
+      try {
+        parsed = JSON.parse(outputText);
+      } catch {
+        return { status: 'OPENAI_INVALID_JSON', raw: outputText, responseId: payload?.id, toolTrace };
+      }
+
+      let outputDecision;
+      try {
+        outputDecision = validateAgentOutput(parsed);
+      } catch (error) {
+        return { status: 'OPENAI_INVALID_OUTPUT', error: error.message, responseId: payload?.id, toolTrace };
+      }
+
+      return {
+        status: 'OK',
+        output: outputDecision,
+        responseId: payload?.id,
+        promptVersion: GPT_SOURCING_PROMPT_VERSION,
+        toolTrace,
+      };
+    }
+
+    for (const toolCall of functionCalls) {
+      if (state.status !== 'RUNNING') break;
+      let args;
+      try {
+        args = JSON.parse(toolCall.arguments || '{}');
+      } catch {
+        stopState(state, 'INVALID_TOOL_ARGUMENTS', { tool: toolCall.name });
+        return { status: 'OPENAI_INVALID_TOOL_ARGUMENTS', responseId: payload?.id, toolTrace };
+      }
+
+      recordAction(state, `TOOL:${toolCall.name}`);
+      if (state.status !== 'RUNNING') break;
+
+      let result;
+      try {
+        result = await executeSourcingTool(toolCall.name, args, req);
+      } catch (error) {
+        result = { ok: false, status: 'TOOL_ERROR', error: error instanceof Error ? error.message : 'tool_failed' };
+      }
+
+      toolTrace.push({ name: toolCall.name, arguments: args, result });
+      input.push({
+        type: 'function_call_output',
+        call_id: toolCall.call_id,
+        output: JSON.stringify(result),
+      });
+    }
+
+    if (state.status !== 'RUNNING') {
+      return {
+        status: 'AGENT_STOPPED',
+        reason: state.lastResult?.reason || 'AGENT_STOPPED',
+        responseId: lastResponse?.id,
+        toolTrace,
+      };
+    }
   }
 
-  const outputText = extractResponseText(payload);
-  if (!outputText) return { status: 'OPENAI_EMPTY', responseId: payload?.id };
-
-  let parsed;
-  try {
-    parsed = JSON.parse(outputText);
-  } catch {
-    return { status: 'OPENAI_INVALID_JSON', raw: outputText, responseId: payload?.id };
-  }
-
-  let output;
-  try {
-    output = validateAgentOutput(parsed);
-  } catch (error) {
-    return { status: 'OPENAI_INVALID_OUTPUT', error: error.message, responseId: payload?.id };
-  }
-
-  return {
-    status: 'OK',
-    output,
-    responseId: payload?.id,
-    promptVersion: GPT_SOURCING_PROMPT_VERSION,
-  };
+  stopState(state, 'MAX_TOOL_ITERATIONS', { max: 8 });
+  return { status: 'AGENT_STOPPED', reason: 'MAX_TOOL_ITERATIONS', responseId: lastResponse?.id, toolTrace };
 }
 
 export default async function handler(req, res) {
@@ -170,6 +295,7 @@ export default async function handler(req, res) {
     candidate: body.candidate ?? null,
     state,
     model: body.model,
+    req,
   });
 
   if (gpt.status === 'OK') {
