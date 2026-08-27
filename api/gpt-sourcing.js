@@ -11,6 +11,7 @@ import {
   GPT_SOURCING_SYSTEM_PROMPT,
 } from '../modules/gpt-sourcing-prompt.js';
 import { listSourcingSources, resolveSource } from '../modules/sourcing-source-registry.js';
+import { fetchAlibabaThroughPiloterr } from './alibaba-piloterr.js';
 
 const OUTPUT_SCHEMA = {
   type: 'object', additionalProperties: false,
@@ -40,8 +41,14 @@ export async function executeSourcingTool(name, args, req) {
   if (name === 'search_source') {
     const source = String(args?.source || '').trim().toLowerCase(); const query = typeof args?.query === 'string' ? args.query.trim() : ''; const limit = Number.isInteger(args?.limit) ? Math.min(Math.max(args.limit, 1), 10) : 5;
     if (!source) return { ok: false, status: 'INVALID_ARGUMENT', error: 'source_required' }; if (!query) return { ok: false, status: 'INVALID_ARGUMENT', error: 'query_required' }; const sourceState = resolveSource(source); if (sourceState.status !== 'AVAILABLE') return sourceState; if (source !== 'alibaba') return { ok: false, status: 'UNSUPPORTED_ADAPTER', sourceId: source };
-    const searchUrl = `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(query)}`; const payload = await callSourceEndpoint(req, source, searchUrl);
-    return { ok: Boolean(payload.ok), source, status: payload.acquisitionStatus || payload.extractionStatus || payload.status || 'UNKNOWN', sourceUrl: payload.sourceUrl || searchUrl, evidenceStatus: payload.evidenceStatus || 'UNKNOWN', productCandidates: Array.isArray(payload.productCandidates) ? payload.productCandidates.slice(0, limit) : [], acquisition: payload.acquisition || null, providerConfigured: payload.providerConfigured ?? null, error: payload.error || null, directError: payload.directError || null, providerError: payload.providerError || null, readerDiagnostics: payload.readerDiagnostics || null };
+    const searchUrl = `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(query)}`;
+    try {
+      const payload = await fetchAlibabaThroughPiloterr(searchUrl, { search: true });
+      const candidates = Array.isArray(payload.extracted?.candidates) ? payload.extracted.candidates.slice(0, limit) : [];
+      return { ok: candidates.length > 0, source, status: candidates.length ? 'CANDIDATES_FOUND' : 'EMPTY', sourceUrl: searchUrl, evidenceStatus: candidates.length ? 'CANDIDATES_ONLY' : 'INSUFFICIENT', productCandidates: candidates, acquisition: payload.acquisition || 'PILOTERR_SEARCH_API', providerConfigured: true, error: null, directError: null, providerError: null };
+    } catch (error) {
+      return { ok: false, source, status: 'TOOL_ERROR', sourceUrl: searchUrl, evidenceStatus: 'INSUFFICIENT', productCandidates: [], acquisition: 'PILOTERR_SEARCH_API', providerConfigured: true, error: error instanceof Error ? error.message : 'piloterr_failed', providerError: error instanceof Error ? error.message : 'piloterr_failed', directError: null };
+    }
   }
   if (name === 'inspect_source_product') {
     const source = String(args?.source || '').trim().toLowerCase(); const url = typeof args?.url === 'string' ? args.url.trim() : ''; if (!source) return { ok: false, status: 'INVALID_ARGUMENT', error: 'source_required' }; if (!url) return { ok: false, status: 'INVALID_ARGUMENT', error: 'url_required' }; const sourceState = resolveSource(source); if (sourceState.status !== 'AVAILABLE') return sourceState; if (source !== 'alibaba' || !/^https:\/\/(?:[^/]+\.)?alibaba\.com\//i.test(url)) return { ok: false, status: 'INVALID_ARGUMENT', error: 'unsupported_source_url' }; const payload = await callSourceEndpoint(req, source, url); return { ok: Boolean(payload.ok), source, status: payload.acquisitionStatus || payload.extractionStatus || payload.status || 'UNKNOWN', sourceUrl: payload.sourceUrl || url, acquisition: payload.acquisition || null, acquisitionUrl: payload.acquisitionUrl || url, extractionStatus: payload.extractionStatus || 'UNKNOWN', evidenceStatus: payload.evidenceStatus || 'UNKNOWN', extracted: payload.extracted || { product: null, displayedPrice: null, moq: null, supplier: null, supplierCountry: null }, error: payload.error || null, directError: payload.directError || null, providerError: payload.providerError || null, providerConfigured: payload.providerConfigured ?? null, readerDiagnostics: payload.readerDiagnostics || null };
