@@ -19,6 +19,8 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      WEBSTRACTOR_API_KEY: ${{ secrets.WEBSTRACTOR_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,11 +38,14 @@ jobs:
         run: npm test
 
       - name: Run real Webstractor provider test
-        if: ${{ secrets.WEBSTRACTOR_API_KEY != '' }}
+        if: ${{ env.WEBSTRACTOR_API_KEY != '' }}
         env:
-          WEBSTRACTOR_API_KEY: ${{ secrets.WEBSTRACTOR_API_KEY }}
           RUN_REAL_PROVIDER_TEST: '1'
         run: node --test tests/webstractor-provider.test.mjs
+
+      - name: Report real provider test status
+        if: ${{ env.WEBSTRACTOR_API_KEY == '' }}
+        run: echo "REAL_PROVIDER_TEST=NOT_RUN (WEBSTRACTOR_API_KEY not configured)"
 
   deploy:
     needs: test
