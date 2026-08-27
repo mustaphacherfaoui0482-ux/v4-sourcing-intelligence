@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isTerminalDecision, runV4Decision } from '../api/gpt-sourcing.js';
+import { isGptDecisionAllowed, isTerminalDecision, runV4Decision } from '../api/gpt-sourcing.js';
 
 test('V4 terminal decisions are authoritative', () => {
   assert.equal(isTerminalDecision('TESTER'), true);
@@ -15,10 +15,7 @@ test('missing economic data does not become zero', () => {
     confidence: 80,
     riskScore: 20,
     profitabilityScore: null,
-    offer: {
-      price: null,
-      quantity: null,
-    },
+    offer: { price: null, quantity: null },
   });
 
   assert.equal(result.decision, 'ATTENDRE');
@@ -43,4 +40,16 @@ test('high-risk opportunity is rejected by V4', () => {
   });
 
   assert.equal(result.decision, 'EVITER');
+});
+
+test('GPT cannot override terminal V4 decisions', () => {
+  assert.equal(isGptDecisionAllowed({ decision: 'TESTER' }, 'STOP'), false);
+  assert.equal(isGptDecisionAllowed({ decision: 'EVITER' }, 'APPROFONDIR'), false);
+});
+
+test('GPT can only deepen or wait when V4 is non-terminal', () => {
+  assert.equal(isGptDecisionAllowed({ decision: 'ATTENDRE' }, 'APPROFONDIR'), true);
+  assert.equal(isGptDecisionAllowed({ decision: 'ATTENDRE' }, 'ATTENDRE'), true);
+  assert.equal(isGptDecisionAllowed({ decision: 'ATTENDRE' }, 'TESTER'), false);
+  assert.equal(isGptDecisionAllowed({ decision: 'APPROFONDIR' }, 'EVITER'), false);
 });
