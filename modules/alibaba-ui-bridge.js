@@ -2,6 +2,7 @@ import './alibaba-csv-batch-runtime.js';
 import { renderAlibabaImport } from './alibaba-import.js';
 import { EMPTY_OPPORTUNITY, initDashboardRuntime } from './dashboard-runtime.js';
 import { mountManualCompletion } from './v4-manual-completion.js';
+import './gpt-sourcing-ui.js';
 
 function resetStaleEmptyOpportunity() {
   try {
