@@ -32,18 +32,24 @@ export const SOURCING_TOOLS = Object.freeze([
     parameters: {
       type: 'object',
       properties: {
-        query: {
-          type: 'string',
-          description: 'Product or sourcing query, for example smartphone thermal camera.',
-        },
-        limit: {
-          type: 'integer',
-          minimum: 1,
-          maximum: 10,
-          description: 'Maximum number of candidate product URLs to return.',
-        },
+        query: { type: 'string', description: 'Product or sourcing query, for example smartphone thermal camera.' },
+        limit: { type: 'integer', minimum: 1, maximum: 10, description: 'Maximum number of candidate product URLs to return.' },
       },
       required: ['query', 'limit'],
+      additionalProperties: false,
+    },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'inspect_alibaba_product',
+    description: 'Inspect one Alibaba product URL using the existing V4 acquisition and extraction pipeline. Return only observed fields and extraction status. Missing values remain null/UNKNOWN.',
+    parameters: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'HTTPS Alibaba product URL returned by search_alibaba or supplied as evidence.' },
+      },
+      required: ['url'],
       additionalProperties: false,
     },
     strict: true,
@@ -76,16 +82,11 @@ export function isGptDecisionAllowed(v4Decision, gptDecision) {
 }
 
 function extractResponseText(payload) {
-  if (typeof payload?.output_text === 'string' && payload.output_text.trim()) {
-    return payload.output_text;
-  }
-
+  if (typeof payload?.output_text === 'string' && payload.output_text.trim()) return payload.output_text;
   const output = Array.isArray(payload?.output) ? payload.output : [];
   for (const item of output) {
     const content = Array.isArray(item?.content) ? item.content : [];
-    for (const part of content) {
-      if (typeof part?.text === 'string' && part.text.trim()) return part.text;
-    }
+    for (const part of content) if (typeof part?.text === 'string' && part.text.trim()) return part.text;
   }
   return null;
 }
@@ -97,42 +98,68 @@ function requestOrigin(req) {
   return host ? `${protocol}://${host}` : null;
 }
 
-export async function executeSourcingTool(name, args, req) {
-  if (name !== 'search_alibaba') throw new Error(`Unknown sourcing tool: ${name}`);
-
-  const query = typeof args?.query === 'string' ? args.query.trim() : '';
-  const limit = Number.isInteger(args?.limit) ? Math.min(Math.max(args.limit, 1), 10) : 5;
-  if (!query) return { ok: false, status: 'INVALID_ARGUMENT', error: 'query_required' };
-
+async function callAlibabaEndpoint(req, url) {
   const origin = requestOrigin(req);
   if (!origin) return { ok: false, status: 'TOOL_UNAVAILABLE', error: 'request_origin_unavailable' };
-
-  const searchUrl = `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(query)}`;
   const response = await fetch(`${origin}/api/alibaba-import`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ url: searchUrl }),
+    body: JSON.stringify({ url }),
     signal: AbortSignal.timeout(12_000),
   });
-
   const payload = await response.json().catch(() => null);
-  if (!response.ok || !payload) {
-    return { ok: false, status: 'TOOL_ERROR', httpStatus: response.status, error: 'alibaba_search_failed' };
+  if (!response.ok || !payload) return { ok: false, status: 'TOOL_ERROR', httpStatus: response.status, error: 'alibaba_endpoint_failed' };
+  return payload;
+}
+
+export async function executeSourcingTool(name, args, req) {
+  if (name === 'search_alibaba') {
+    const query = typeof args?.query === 'string' ? args.query.trim() : '';
+    const limit = Number.isInteger(args?.limit) ? Math.min(Math.max(args.limit, 1), 10) : 5;
+    if (!query) return { ok: false, status: 'INVALID_ARGUMENT', error: 'query_required' };
+
+    const searchUrl = `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(query)}`;
+    const payload = await callAlibabaEndpoint(req, searchUrl);
+    return {
+      ok: Boolean(payload.ok),
+      status: payload.acquisitionStatus || payload.extractionStatus || 'UNKNOWN',
+      source: payload.source || 'Alibaba.com',
+      sourceUrl: payload.sourceUrl || searchUrl,
+      evidenceStatus: payload.evidenceStatus || 'UNKNOWN',
+      productCandidates: Array.isArray(payload.productCandidates) ? payload.productCandidates.slice(0, limit) : [],
+      acquisition: payload.acquisition || null,
+      providerConfigured: payload.providerConfigured ?? null,
+      directError: payload.directError || null,
+      providerError: payload.providerError || null,
+      readerDiagnostics: payload.readerDiagnostics || null,
+    };
   }
 
-  return {
-    ok: Boolean(payload.ok),
-    status: payload.acquisitionStatus || payload.extractionStatus || 'UNKNOWN',
-    source: payload.source || 'Alibaba.com',
-    sourceUrl: payload.sourceUrl || searchUrl,
-    evidenceStatus: payload.evidenceStatus || 'UNKNOWN',
-    productCandidates: Array.isArray(payload.productCandidates) ? payload.productCandidates.slice(0, limit) : [],
-    acquisition: payload.acquisition || null,
-    providerConfigured: payload.providerConfigured ?? null,
-    directError: payload.directError || null,
-    providerError: payload.providerError || null,
-    readerDiagnostics: payload.readerDiagnostics || null,
-  };
+  if (name === 'inspect_alibaba_product') {
+    const url = typeof args?.url === 'string' ? args.url.trim() : '';
+    if (!url) return { ok: false, status: 'INVALID_ARGUMENT', error: 'url_required' };
+    if (!/^https:\/\/(?:[^/]+\.)?alibaba\.com\//i.test(url)) {
+      return { ok: false, status: 'INVALID_ARGUMENT', error: 'invalid_alibaba_url' };
+    }
+    const payload = await callAlibabaEndpoint(req, url);
+    return {
+      ok: Boolean(payload.ok),
+      status: payload.acquisitionStatus || payload.extractionStatus || 'UNKNOWN',
+      source: payload.source || 'Alibaba.com',
+      sourceUrl: payload.sourceUrl || url,
+      acquisition: payload.acquisition || null,
+      acquisitionUrl: payload.acquisitionUrl || url,
+      extractionStatus: payload.extractionStatus || 'UNKNOWN',
+      evidenceStatus: payload.evidenceStatus || 'UNKNOWN',
+      extracted: payload.extracted || { product: null, displayedPrice: null, moq: null, supplier: null, supplierCountry: null },
+      directError: payload.directError || null,
+      providerError: payload.providerError || null,
+      providerConfigured: payload.providerConfigured ?? null,
+      readerDiagnostics: payload.readerDiagnostics || null,
+    };
+  }
+
+  throw new Error(`Unknown sourcing tool: ${name}`);
 }
 
 async function callOpenAI({ target, candidate, state, model, req }) {
@@ -147,38 +174,20 @@ async function callOpenAI({ target, candidate, state, model, req }) {
     };
   }
 
-  const input = [{
-    role: 'user',
-    content: JSON.stringify({
-      target,
-      candidate,
-      v4State: buildAgentContext(state),
-    }),
-  }];
-
+  const input = [{ role: 'user', content: JSON.stringify({ target, candidate, v4State: buildAgentContext(state) }) }];
   let lastResponse = null;
   const toolTrace = [];
 
   for (let iteration = 0; iteration < 8; iteration += 1) {
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: selectedModel,
         instructions: GPT_SOURCING_SYSTEM_PROMPT,
         input,
         tools: SOURCING_TOOLS,
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'v4_sourcing_decision',
-            strict: true,
-            schema: OUTPUT_SCHEMA,
-          },
-        },
+        text: { format: { type: 'json_schema', name: 'v4_sourcing_decision', strict: true, schema: OUTPUT_SCHEMA } },
       }),
     });
 
@@ -191,71 +200,35 @@ async function callOpenAI({ target, candidate, state, model, req }) {
     lastResponse = payload;
     const output = Array.isArray(payload?.output) ? payload.output : [];
     input.push(...output);
-
     const functionCalls = output.filter((item) => item?.type === 'function_call');
+
     if (!functionCalls.length) {
       const outputText = extractResponseText(payload);
       if (!outputText) return { status: 'OPENAI_EMPTY', responseId: payload?.id, toolTrace };
-
       let parsed;
-      try {
-        parsed = JSON.parse(outputText);
-      } catch {
-        return { status: 'OPENAI_INVALID_JSON', raw: outputText, responseId: payload?.id, toolTrace };
-      }
-
+      try { parsed = JSON.parse(outputText); } catch { return { status: 'OPENAI_INVALID_JSON', raw: outputText, responseId: payload?.id, toolTrace }; }
       let outputDecision;
-      try {
-        outputDecision = validateAgentOutput(parsed);
-      } catch (error) {
-        return { status: 'OPENAI_INVALID_OUTPUT', error: error.message, responseId: payload?.id, toolTrace };
-      }
-
-      return {
-        status: 'OK',
-        output: outputDecision,
-        responseId: payload?.id,
-        promptVersion: GPT_SOURCING_PROMPT_VERSION,
-        toolTrace,
-      };
+      try { outputDecision = validateAgentOutput(parsed); } catch (error) { return { status: 'OPENAI_INVALID_OUTPUT', error: error.message, responseId: payload?.id, toolTrace }; }
+      return { status: 'OK', output: outputDecision, responseId: payload?.id, promptVersion: GPT_SOURCING_PROMPT_VERSION, toolTrace };
     }
 
     for (const toolCall of functionCalls) {
       if (state.status !== 'RUNNING') break;
       let args;
-      try {
-        args = JSON.parse(toolCall.arguments || '{}');
-      } catch {
+      try { args = JSON.parse(toolCall.arguments || '{}'); } catch {
         stopState(state, 'INVALID_TOOL_ARGUMENTS', { tool: toolCall.name });
         return { status: 'OPENAI_INVALID_TOOL_ARGUMENTS', responseId: payload?.id, toolTrace };
       }
-
       recordAction(state, `TOOL:${toolCall.name}`);
       if (state.status !== 'RUNNING') break;
-
       let result;
-      try {
-        result = await executeSourcingTool(toolCall.name, args, req);
-      } catch (error) {
-        result = { ok: false, status: 'TOOL_ERROR', error: error instanceof Error ? error.message : 'tool_failed' };
-      }
-
+      try { result = await executeSourcingTool(toolCall.name, args, req); }
+      catch (error) { result = { ok: false, status: 'TOOL_ERROR', error: error instanceof Error ? error.message : 'tool_failed' }; }
       toolTrace.push({ name: toolCall.name, arguments: args, result });
-      input.push({
-        type: 'function_call_output',
-        call_id: toolCall.call_id,
-        output: JSON.stringify(result),
-      });
+      input.push({ type: 'function_call_output', call_id: toolCall.call_id, output: JSON.stringify(result) });
     }
 
-    if (state.status !== 'RUNNING') {
-      return {
-        status: 'AGENT_STOPPED',
-        reason: state.lastResult?.reason || 'AGENT_STOPPED',
-        responseId: lastResponse?.id,
-        toolTrace,
-      };
-    }
+    if (state.status !== 'RUNNING') return { status: 'AGENT_STOPPED', reason: state.lastResult?.reason || 'AGENT_STOPPED', responseId: lastResponse?.id, toolTrace };
   }
 
   stopState(state, 'MAX_TOOL_ITERATIONS', { max: 8 });
@@ -264,46 +237,27 @@ async function callOpenAI({ target, candidate, state, model, req }) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
-
   const body = req.body || {};
   const target = typeof body.target === 'string' ? body.target.trim() : '';
   if (!target) return json(res, 400, { error: 'target is required' });
 
   const state = createSourcingState({ target, actual: body.candidate ?? null });
   recordAction(state, 'INIT');
-
   let v4Decision = null;
+
   if (body.candidate && typeof body.candidate === 'object') {
     v4Decision = runV4Decision(body.candidate);
     state.lastResult = { type: 'V4_DECISION', value: v4Decision };
-
     if (isTerminalDecision(v4Decision.decision)) {
       stopState(state, 'V4_DECISION_REACHED', v4Decision);
-      return json(res, 200, {
-        version: state.version,
-        target,
-        status: state.status,
-        state: buildAgentContext(state),
-        v4Decision,
-        gpt: { status: 'SKIPPED_V4_TERMINAL_DECISION' },
-      });
+      return json(res, 200, { version: state.version, target, status: state.status, state: buildAgentContext(state), v4Decision, gpt: { status: 'SKIPPED_V4_TERMINAL_DECISION' } });
     }
   }
 
-  const gpt = await callOpenAI({
-    target,
-    candidate: body.candidate ?? null,
-    state,
-    model: body.model,
-    req,
-  });
-
+  const gpt = await callOpenAI({ target, candidate: body.candidate ?? null, state, model: body.model, req });
   if (gpt.status === 'OK') {
     if (!isGptDecisionAllowed(v4Decision, gpt.output.decision)) {
-      stopState(state, 'GPT_DECISION_CONFLICT_WITH_V4', {
-        v4Decision: v4Decision?.decision ?? null,
-        gptDecision: gpt.output.decision,
-      });
+      stopState(state, 'GPT_DECISION_CONFLICT_WITH_V4', { v4Decision: v4Decision?.decision ?? null, gptDecision: gpt.output.decision });
       gpt.status = 'REJECTED_V4_AUTHORITY';
     } else if (gpt.output.decision === 'STOP') {
       stopState(state, 'GPT_STOP', gpt.output);
@@ -314,13 +268,5 @@ export default async function handler(req, res) {
     }
   }
 
-  return json(res, 200, {
-    version: state.version,
-    promptVersion: GPT_SOURCING_PROMPT_VERSION,
-    target,
-    status: state.status,
-    state: buildAgentContext(state),
-    v4Decision,
-    gpt,
-  });
+  return json(res, 200, { version: state.version, promptVersion: GPT_SOURCING_PROMPT_VERSION, target, status: state.status, state: buildAgentContext(state), v4Decision, gpt });
 }
