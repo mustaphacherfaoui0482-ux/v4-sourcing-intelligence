@@ -6,16 +6,10 @@ import {
   stopState,
   validateAgentOutput,
 } from '../modules/gpt-sourcing-agent.js';
-
-const SYSTEM_PROMPT = `Tu es GPT SOURCING, agent expert opérant au-dessus de V4 Sourcing Intelligence.
-V4 reste l'autorité pour les règles déterministes, calculs, preuves, risques, Risk Gates et décision.
-Ne transforme jamais UNKNOWN/NULL en 0. Potential != Confidence. Ne calcule jamais un second score global.
-Travaille avec TARGET, ACTUAL, OPEN_GAPS, CLOSED_GAPS, LAST_ACTION, LAST_RESULT et NEXT_ALLOWED_ACTION.
-Un GAP fermé ne peut être rouvert sans nouvelle preuve. Une seule action principale par cycle.
-Si V4 a déjà produit une décision finale, ne la remplace pas.
-Si aucune action utile n'est possible, STOP.
-La priorité est la qualité de décision, pas la quantité de produits.
-Réponds avec une décision V4 valide et une prochaine action explicite.`;
+import {
+  GPT_SOURCING_PROMPT_VERSION,
+  GPT_SOURCING_SYSTEM_PROMPT,
+} from '../modules/gpt-sourcing-prompt.js';
 
 const OUTPUT_SCHEMA = {
   type: 'object',
@@ -31,6 +25,10 @@ const OUTPUT_SCHEMA = {
 };
 
 const TERMINAL_DECISIONS = new Set(['TESTER', 'EVITER']);
+const V4_NON_TERMINAL_ALLOWED = {
+  APPROFONDIR: new Set(['APPROFONDIR', 'ATTENDRE', 'STOP']),
+  ATTENDRE: new Set(['APPROFONDIR', 'ATTENDRE', 'STOP']),
+};
 
 function json(res, status, body) {
   res.status(status).json(body);
@@ -44,6 +42,28 @@ export function isTerminalDecision(decision) {
   return TERMINAL_DECISIONS.has(decision);
 }
 
+export function isGptDecisionAllowed(v4Decision, gptDecision) {
+  if (!v4Decision) return true;
+  if (isTerminalDecision(v4Decision.decision)) return false;
+  const allowed = V4_NON_TERMINAL_ALLOWED[v4Decision.decision];
+  return allowed ? allowed.has(gptDecision) : gptDecision === 'STOP';
+}
+
+function extractResponseText(payload) {
+  if (typeof payload?.output_text === 'string' && payload.output_text.trim()) {
+    return payload.output_text;
+  }
+
+  const output = Array.isArray(payload?.output) ? payload.output : [];
+  for (const item of output) {
+    const content = Array.isArray(item?.content) ? item.content : [];
+    for (const part of content) {
+      if (typeof part?.text === 'string' && part.text.trim()) return part.text;
+    }
+  }
+  return null;
+}
+
 async function callOpenAI({ target, candidate, state, model }) {
   const apiKey = process.env.OPENAI_API_KEY;
   const selectedModel = model || process.env.OPENAI_MODEL;
@@ -51,6 +71,7 @@ async function callOpenAI({ target, candidate, state, model }) {
     return {
       status: 'NOT_CONFIGURED',
       reason: !apiKey ? 'OPENAI_API_KEY missing' : 'OPENAI_MODEL missing',
+      promptVersion: GPT_SOURCING_PROMPT_VERSION,
       state: buildAgentContext(state),
     };
   }
@@ -64,8 +85,15 @@ async function callOpenAI({ target, candidate, state, model }) {
     body: JSON.stringify({
       model: selectedModel,
       input: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: JSON.stringify({ target, candidate, v4State: buildAgentContext(state) }) },
+        { role: 'system', content: GPT_SOURCING_SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: JSON.stringify({
+            target,
+            candidate,
+            v4State: buildAgentContext(state),
+          }),
+        },
       ],
       text: {
         format: {
@@ -81,23 +109,31 @@ async function callOpenAI({ target, candidate, state, model }) {
   const payload = await response.json();
   if (!response.ok) {
     const error = payload?.error?.message || `OpenAI HTTP ${response.status}`;
-    return { status: 'OPENAI_ERROR', error };
+    return { status: 'OPENAI_ERROR', error, httpStatus: response.status };
   }
 
-  const outputText = payload.output_text;
-  if (!outputText) return { status: 'OPENAI_EMPTY' };
+  const outputText = extractResponseText(payload);
+  if (!outputText) return { status: 'OPENAI_EMPTY', responseId: payload?.id };
 
   let parsed;
   try {
     parsed = JSON.parse(outputText);
   } catch {
-    return { status: 'OPENAI_INVALID_JSON', raw: outputText };
+    return { status: 'OPENAI_INVALID_JSON', raw: outputText, responseId: payload?.id };
+  }
+
+  let output;
+  try {
+    output = validateAgentOutput(parsed);
+  } catch (error) {
+    return { status: 'OPENAI_INVALID_OUTPUT', error: error.message, responseId: payload?.id };
   }
 
   return {
     status: 'OK',
-    output: validateAgentOutput(parsed),
-    responseId: payload.id,
+    output,
+    responseId: payload?.id,
+    promptVersion: GPT_SOURCING_PROMPT_VERSION,
   };
 }
 
@@ -116,8 +152,6 @@ export default async function handler(req, res) {
     v4Decision = runV4Decision(body.candidate);
     state.lastResult = { type: 'V4_DECISION', value: v4Decision };
 
-    // V4 is authoritative. Do not call GPT again when V4 already reached
-    // a terminal decision; this prevents the agent from overriding V4.
     if (isTerminalDecision(v4Decision.decision)) {
       stopState(state, 'V4_DECISION_REACHED', v4Decision);
       return json(res, 200, {
@@ -138,12 +172,25 @@ export default async function handler(req, res) {
     model: body.model,
   });
 
-  if (gpt.status === 'OK' && gpt.output.decision === 'STOP') {
-    stopState(state, 'GPT_STOP', gpt.output);
+  if (gpt.status === 'OK') {
+    if (!isGptDecisionAllowed(v4Decision, gpt.output.decision)) {
+      stopState(state, 'GPT_DECISION_CONFLICT_WITH_V4', {
+        v4Decision: v4Decision?.decision ?? null,
+        gptDecision: gpt.output.decision,
+      });
+      gpt.status = 'REJECTED_V4_AUTHORITY';
+    } else if (gpt.output.decision === 'STOP') {
+      stopState(state, 'GPT_STOP', gpt.output);
+    } else {
+      recordAction(state, `GPT:${gpt.output.nextAction}`);
+      state.lastResult = { type: 'GPT_DECISION', value: gpt.output };
+      state.nextAllowedAction = gpt.output.nextAction;
+    }
   }
 
   return json(res, 200, {
     version: state.version,
+    promptVersion: GPT_SOURCING_PROMPT_VERSION,
     target,
     status: state.status,
     state: buildAgentContext(state),
