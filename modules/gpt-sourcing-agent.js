@@ -48,7 +48,13 @@ function gapKey(gap) {
 }
 
 function actionKey(action) {
-  return normalizeKey(action);
+  if (typeof action === 'string') return normalizeKey(action);
+  if (!action || typeof action !== 'object') return normalizeKey(action);
+  const source = normalizeKey(action.source);
+  const query = normalizeKey(action.query);
+  const url = normalizeKey(action.url);
+  const name = normalizeKey(action.name || action.action || action.tool);
+  return [name, source, query, url].filter(Boolean).join('|');
 }
 
 export function addGap(state, gap, { newEvidence = false } = {}) {
