@@ -95,17 +95,19 @@ function normalizePiloterrSearch(payload = {}) {
     url: firstNonEmpty(item?.listing_url, item?.url, item?.product_url),
     productId: firstNonEmpty(item?.product_id, item?.id),
     title: firstNonEmpty(item?.title, item?.name),
-    displayedPrice: firstNonEmpty(item?.price?.min, item?.price?.display, item?.price, item?.price_usd),
-    moq: firstNonEmpty(item?.moq, item?.minimum_order_quantity, item?.min_order_quantity, item?.price?.quantity_prices?.[0]?.min_quantity),
-    supplier: firstNonEmpty(item?.seller?.company_name, item?.supplier, item?.seller?.name),
-    supplierCountry: firstNonEmpty(item?.seller?.country, item?.country, item?.seller?.country_code),
+    displayedPrice: firstNonEmpty(item?.price_min, item?.price?.min, item?.price?.display, item?.price_text, item?.price, item?.price_usd),
+    priceMax: firstNonEmpty(item?.price_max, item?.price?.max),
+    moq: firstNonEmpty(item?.min_order, item?.moq, item?.minimum_order_quantity, item?.min_order_quantity, item?.price?.quantity_prices?.[0]?.min_quantity),
+    supplier: firstNonEmpty(item?.seller_name, item?.seller?.company_name, item?.supplier, item?.seller?.name),
+    supplierCountry: firstNonEmpty(item?.seller_country, item?.country, item?.seller?.country, item?.seller?.country_code),
   })).filter((item) => item.url || item.productId || item.title);
 
   return Object.freeze({
     candidates,
-    total: firstNonEmpty(payload?.total, payload?.pagination?.total, payload?.count),
+    total: firstNonEmpty(payload?.total_results, payload?.total, payload?.pagination?.total, payload?.count),
     page: firstNonEmpty(payload?.page, payload?.pagination?.page),
-    pages: firstNonEmpty(payload?.pages, payload?.pagination?.pages),
+    pages: firstNonEmpty(payload?.total_pages, payload?.pages, payload?.pagination?.pages),
+    next: payload?.next ?? null,
     providerPayload: payload,
   });
 }
@@ -150,6 +152,6 @@ export async function fetchAlibabaThroughPiloterr(url, { search = false } = {}) 
     acquisition: 'PILOTERR_BROWSER_API',
     acquisitionUrl: endpoint,
     targetUrl,
-    extracted,
+    extracted: { ...extracted, parserStatus: 'PARTIAL_OR_COMPLETE' },
   };
 }
