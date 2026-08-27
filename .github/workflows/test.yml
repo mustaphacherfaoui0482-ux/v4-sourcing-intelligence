@@ -37,15 +37,10 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Run real Webstractor provider test
-        if: ${{ env.WEBSTRACTOR_API_KEY != '' }}
+      - name: Run Webstractor provider test
         env:
           RUN_REAL_PROVIDER_TEST: '1'
         run: node --test tests/webstractor-provider.test.mjs
-
-      - name: Report real provider test status
-        if: ${{ env.WEBSTRACTOR_API_KEY == '' }}
-        run: echo "REAL_PROVIDER_TEST=NOT_RUN (WEBSTRACTOR_API_KEY not configured)"
 
   deploy:
     needs: test
