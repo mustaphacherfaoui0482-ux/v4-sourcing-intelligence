@@ -10,6 +10,7 @@ import {
   GPT_SOURCING_PROMPT_VERSION,
   GPT_SOURCING_SYSTEM_PROMPT,
 } from '../modules/gpt-sourcing-prompt.js';
+import { listSourcingSources, resolveSource } from '../modules/sourcing-source-registry.js';
 
 const OUTPUT_SCHEMA = {
   type: 'object',
@@ -27,29 +28,38 @@ const OUTPUT_SCHEMA = {
 export const SOURCING_TOOLS = Object.freeze([
   {
     type: 'function',
-    name: 'search_alibaba',
-    description: 'Search Alibaba product listings for sourcing research. Returns only observed candidate URLs and acquisition/extraction status. Do not infer price, MOQ, supplier, demand, margin, or risk when the tool does not provide them.',
+    name: 'list_sources',
+    description: 'List sourcing source adapters available to V4. A source can be optional or unavailable; never infer data from an unavailable source.',
+    parameters: { type: 'object', properties: {}, required: [], additionalProperties: false },
+    strict: true,
+  },
+  {
+    type: 'function',
+    name: 'search_source',
+    description: 'Search one configured sourcing source. Returns only observed candidates and source/acquisition status. Missing fields remain unknown.',
     parameters: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'Product or sourcing query, for example smartphone thermal camera.' },
-        limit: { type: 'integer', minimum: 1, maximum: 10, description: 'Maximum number of candidate product URLs to return.' },
+        source: { type: 'string', description: 'Registered source id, for example alibaba.' },
+        query: { type: 'string', description: 'Product or sourcing query.' },
+        limit: { type: 'integer', minimum: 1, maximum: 10, description: 'Maximum candidates.' },
       },
-      required: ['query', 'limit'],
+      required: ['source', 'query', 'limit'],
       additionalProperties: false,
     },
     strict: true,
   },
   {
     type: 'function',
-    name: 'inspect_alibaba_product',
-    description: 'Inspect one Alibaba product URL using the existing V4 acquisition and extraction pipeline. Return only observed fields and extraction status. Missing values remain null/UNKNOWN.',
+    name: 'inspect_source_product',
+    description: 'Inspect one product URL through its registered source adapter. Return only observed fields and extraction status.',
     parameters: {
       type: 'object',
       properties: {
-        url: { type: 'string', description: 'HTTPS Alibaba product URL returned by search_alibaba or supplied as evidence.' },
+        source: { type: 'string', description: 'Registered source id.' },
+        url: { type: 'string', description: 'Product URL.' },
       },
-      required: ['url'],
+      required: ['source', 'url'],
       additionalProperties: false,
     },
     strict: true,
@@ -62,18 +72,10 @@ const V4_NON_TERMINAL_ALLOWED = {
   ATTENDRE: new Set(['APPROFONDIR', 'ATTENDRE', 'STOP']),
 };
 
-function json(res, status, body) {
-  res.status(status).json(body);
-}
+function json(res, status, body) { res.status(status).json(body); }
 
-export function runV4Decision(candidate) {
-  return evaluateOpportunity(candidate ?? {});
-}
-
-export function isTerminalDecision(decision) {
-  return TERMINAL_DECISIONS.has(decision);
-}
-
+export function runV4Decision(candidate) { return evaluateOpportunity(candidate ?? {}); }
+export function isTerminalDecision(decision) { return TERMINAL_DECISIONS.has(decision); }
 export function isGptDecisionAllowed(v4Decision, gptDecision) {
   if (!v4Decision) return true;
   if (isTerminalDecision(v4Decision.decision)) return false;
@@ -98,64 +100,66 @@ function requestOrigin(req) {
   return host ? `${protocol}://${host}` : null;
 }
 
-async function callAlibabaEndpoint(req, url) {
+async function callSourceEndpoint(req, sourceId, url) {
+  const source = resolveSource(sourceId);
+  if (source.status !== 'AVAILABLE') return { ok: false, status: source.status, sourceId };
+  if (source.adapter !== 'alibaba-import') return { ok: false, status: 'UNSUPPORTED_ADAPTER', sourceId };
+
   const origin = requestOrigin(req);
   if (!origin) return { ok: false, status: 'TOOL_UNAVAILABLE', error: 'request_origin_unavailable' };
   const response = await fetch(`${origin}/api/alibaba-import`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ url }),
-    signal: AbortSignal.timeout(12_000),
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ url }), signal: AbortSignal.timeout(12_000),
   });
   const payload = await response.json().catch(() => null);
-  if (!response.ok || !payload) return { ok: false, status: 'TOOL_ERROR', httpStatus: response.status, error: 'alibaba_endpoint_failed' };
+  if (!response.ok || !payload) return { ok: false, status: 'TOOL_ERROR', httpStatus: response.status, error: 'source_endpoint_failed' };
   return payload;
 }
 
 export async function executeSourcingTool(name, args, req) {
-  if (name === 'search_alibaba') {
+  if (name === 'list_sources') return { ok: true, sources: listSourcingSources() };
+
+  if (name === 'search_source') {
+    const source = String(args?.source || '').trim().toLowerCase();
     const query = typeof args?.query === 'string' ? args.query.trim() : '';
     const limit = Number.isInteger(args?.limit) ? Math.min(Math.max(args.limit, 1), 10) : 5;
+    if (!source) return { ok: false, status: 'INVALID_ARGUMENT', error: 'source_required' };
     if (!query) return { ok: false, status: 'INVALID_ARGUMENT', error: 'query_required' };
+    const sourceState = resolveSource(source);
+    if (sourceState.status !== 'AVAILABLE') return sourceState;
+    if (source !== 'alibaba') return { ok: false, status: 'UNSUPPORTED_ADAPTER', sourceId: source };
 
     const searchUrl = `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent(query)}`;
-    const payload = await callAlibabaEndpoint(req, searchUrl);
+    const payload = await callSourceEndpoint(req, source, searchUrl);
     return {
-      ok: Boolean(payload.ok),
-      status: payload.acquisitionStatus || payload.extractionStatus || 'UNKNOWN',
-      source: payload.source || 'Alibaba.com',
-      sourceUrl: payload.sourceUrl || searchUrl,
-      evidenceStatus: payload.evidenceStatus || 'UNKNOWN',
+      ok: Boolean(payload.ok), source, status: payload.acquisitionStatus || payload.extractionStatus || payload.status || 'UNKNOWN',
+      sourceUrl: payload.sourceUrl || searchUrl, evidenceStatus: payload.evidenceStatus || 'UNKNOWN',
       productCandidates: Array.isArray(payload.productCandidates) ? payload.productCandidates.slice(0, limit) : [],
-      acquisition: payload.acquisition || null,
-      providerConfigured: payload.providerConfigured ?? null,
-      directError: payload.directError || null,
-      providerError: payload.providerError || null,
+      acquisition: payload.acquisition || null, providerConfigured: payload.providerConfigured ?? null,
+      directError: payload.directError || null, providerError: payload.providerError || null,
       readerDiagnostics: payload.readerDiagnostics || null,
     };
   }
 
-  if (name === 'inspect_alibaba_product') {
+  if (name === 'inspect_source_product') {
+    const source = String(args?.source || '').trim().toLowerCase();
     const url = typeof args?.url === 'string' ? args.url.trim() : '';
+    if (!source) return { ok: false, status: 'INVALID_ARGUMENT', error: 'source_required' };
     if (!url) return { ok: false, status: 'INVALID_ARGUMENT', error: 'url_required' };
-    if (!/^https:\/\/(?:[^/]+\.)?alibaba\.com\//i.test(url)) {
-      return { ok: false, status: 'INVALID_ARGUMENT', error: 'invalid_alibaba_url' };
+    const sourceState = resolveSource(source);
+    if (sourceState.status !== 'AVAILABLE') return sourceState;
+    if (source !== 'alibaba' || !/^https:\/\/(?:[^/]+\.)?alibaba\.com\//i.test(url)) {
+      return { ok: false, status: 'INVALID_ARGUMENT', error: 'unsupported_source_url' };
     }
-    const payload = await callAlibabaEndpoint(req, url);
+    const payload = await callSourceEndpoint(req, source, url);
     return {
-      ok: Boolean(payload.ok),
-      status: payload.acquisitionStatus || payload.extractionStatus || 'UNKNOWN',
-      source: payload.source || 'Alibaba.com',
-      sourceUrl: payload.sourceUrl || url,
-      acquisition: payload.acquisition || null,
-      acquisitionUrl: payload.acquisitionUrl || url,
-      extractionStatus: payload.extractionStatus || 'UNKNOWN',
+      ok: Boolean(payload.ok), source, status: payload.acquisitionStatus || payload.extractionStatus || payload.status || 'UNKNOWN',
+      sourceUrl: payload.sourceUrl || url, acquisition: payload.acquisition || null,
+      acquisitionUrl: payload.acquisitionUrl || url, extractionStatus: payload.extractionStatus || 'UNKNOWN',
       evidenceStatus: payload.evidenceStatus || 'UNKNOWN',
       extracted: payload.extracted || { product: null, displayedPrice: null, moq: null, supplier: null, supplierCountry: null },
-      directError: payload.directError || null,
-      providerError: payload.providerError || null,
-      providerConfigured: payload.providerConfigured ?? null,
-      readerDiagnostics: payload.readerDiagnostics || null,
+      directError: payload.directError || null, providerError: payload.providerError || null,
+      providerConfigured: payload.providerConfigured ?? null, readerDiagnostics: payload.readerDiagnostics || null,
     };
   }
 
@@ -165,108 +169,58 @@ export async function executeSourcingTool(name, args, req) {
 async function callOpenAI({ target, candidate, state, model, req }) {
   const apiKey = process.env.OPENAI_API_KEY;
   const selectedModel = model || process.env.OPENAI_MODEL;
-  if (!apiKey || !selectedModel) {
-    return {
-      status: 'NOT_CONFIGURED',
-      reason: !apiKey ? 'OPENAI_API_KEY missing' : 'OPENAI_MODEL missing',
-      promptVersion: GPT_SOURCING_PROMPT_VERSION,
-      state: buildAgentContext(state),
-    };
-  }
+  if (!apiKey || !selectedModel) return { status: 'NOT_CONFIGURED', reason: !apiKey ? 'OPENAI_API_KEY missing' : 'OPENAI_MODEL missing', promptVersion: GPT_SOURCING_PROMPT_VERSION, state: buildAgentContext(state) };
 
   const input = [{ role: 'user', content: JSON.stringify({ target, candidate, v4State: buildAgentContext(state) }) }];
-  let lastResponse = null;
-  const toolTrace = [];
-
+  let lastResponse = null; const toolTrace = [];
   for (let iteration = 0; iteration < 8; iteration += 1) {
     const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: selectedModel,
-        instructions: GPT_SOURCING_SYSTEM_PROMPT,
-        input,
-        tools: SOURCING_TOOLS,
-        text: { format: { type: 'json_schema', name: 'v4_sourcing_decision', strict: true, schema: OUTPUT_SCHEMA } },
-      }),
+      method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: selectedModel, instructions: GPT_SOURCING_SYSTEM_PROMPT, input, tools: SOURCING_TOOLS, text: { format: { type: 'json_schema', name: 'v4_sourcing_decision', strict: true, schema: OUTPUT_SCHEMA } } }),
     });
-
     const payload = await response.json();
-    if (!response.ok) {
-      const error = payload?.error?.message || `OpenAI HTTP ${response.status}`;
-      return { status: 'OPENAI_ERROR', error, httpStatus: response.status, toolTrace };
-    }
-
+    if (!response.ok) return { status: 'OPENAI_ERROR', error: payload?.error?.message || `OpenAI HTTP ${response.status}`, httpStatus: response.status, toolTrace };
     lastResponse = payload;
     const output = Array.isArray(payload?.output) ? payload.output : [];
     input.push(...output);
     const functionCalls = output.filter((item) => item?.type === 'function_call');
-
     if (!functionCalls.length) {
       const outputText = extractResponseText(payload);
       if (!outputText) return { status: 'OPENAI_EMPTY', responseId: payload?.id, toolTrace };
-      let parsed;
-      try { parsed = JSON.parse(outputText); } catch { return { status: 'OPENAI_INVALID_JSON', raw: outputText, responseId: payload?.id, toolTrace }; }
-      let outputDecision;
-      try { outputDecision = validateAgentOutput(parsed); } catch (error) { return { status: 'OPENAI_INVALID_OUTPUT', error: error.message, responseId: payload?.id, toolTrace }; }
-      return { status: 'OK', output: outputDecision, responseId: payload?.id, promptVersion: GPT_SOURCING_PROMPT_VERSION, toolTrace };
+      let parsed; try { parsed = JSON.parse(outputText); } catch { return { status: 'OPENAI_INVALID_JSON', raw: outputText, responseId: payload?.id, toolTrace }; }
+      try { const outputDecision = validateAgentOutput(parsed); return { status: 'OK', output: outputDecision, responseId: payload?.id, promptVersion: GPT_SOURCING_PROMPT_VERSION, toolTrace }; }
+      catch (error) { return { status: 'OPENAI_INVALID_OUTPUT', error: error.message, responseId: payload?.id, toolTrace }; }
     }
-
     for (const toolCall of functionCalls) {
       if (state.status !== 'RUNNING') break;
-      let args;
-      try { args = JSON.parse(toolCall.arguments || '{}'); } catch {
-        stopState(state, 'INVALID_TOOL_ARGUMENTS', { tool: toolCall.name });
-        return { status: 'OPENAI_INVALID_TOOL_ARGUMENTS', responseId: payload?.id, toolTrace };
-      }
+      let args; try { args = JSON.parse(toolCall.arguments || '{}'); } catch { stopState(state, 'INVALID_TOOL_ARGUMENTS', { tool: toolCall.name }); return { status: 'OPENAI_INVALID_TOOL_ARGUMENTS', responseId: payload?.id, toolTrace }; }
       recordAction(state, `TOOL:${toolCall.name}`);
       if (state.status !== 'RUNNING') break;
-      let result;
-      try { result = await executeSourcingTool(toolCall.name, args, req); }
-      catch (error) { result = { ok: false, status: 'TOOL_ERROR', error: error instanceof Error ? error.message : 'tool_failed' }; }
+      let result; try { result = await executeSourcingTool(toolCall.name, args, req); } catch (error) { result = { ok: false, status: 'TOOL_ERROR', error: error instanceof Error ? error.message : 'tool_failed' }; }
       toolTrace.push({ name: toolCall.name, arguments: args, result });
       input.push({ type: 'function_call_output', call_id: toolCall.call_id, output: JSON.stringify(result) });
     }
-
     if (state.status !== 'RUNNING') return { status: 'AGENT_STOPPED', reason: state.lastResult?.reason || 'AGENT_STOPPED', responseId: lastResponse?.id, toolTrace };
   }
-
   stopState(state, 'MAX_TOOL_ITERATIONS', { max: 8 });
   return { status: 'AGENT_STOPPED', reason: 'MAX_TOOL_ITERATIONS', responseId: lastResponse?.id, toolTrace };
 }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return json(res, 405, { error: 'Method not allowed' });
-  const body = req.body || {};
-  const target = typeof body.target === 'string' ? body.target.trim() : '';
+  const body = req.body || {}; const target = typeof body.target === 'string' ? body.target.trim() : '';
   if (!target) return json(res, 400, { error: 'target is required' });
-
-  const state = createSourcingState({ target, actual: body.candidate ?? null });
-  recordAction(state, 'INIT');
+  const state = createSourcingState({ target, actual: body.candidate ?? null }); recordAction(state, 'INIT');
   let v4Decision = null;
-
   if (body.candidate && typeof body.candidate === 'object') {
-    v4Decision = runV4Decision(body.candidate);
-    state.lastResult = { type: 'V4_DECISION', value: v4Decision };
-    if (isTerminalDecision(v4Decision.decision)) {
-      stopState(state, 'V4_DECISION_REACHED', v4Decision);
-      return json(res, 200, { version: state.version, target, status: state.status, state: buildAgentContext(state), v4Decision, gpt: { status: 'SKIPPED_V4_TERMINAL_DECISION' } });
-    }
+    v4Decision = runV4Decision(body.candidate); state.lastResult = { type: 'V4_DECISION', value: v4Decision };
+    if (isTerminalDecision(v4Decision.decision)) { stopState(state, 'V4_DECISION_REACHED', v4Decision); return json(res, 200, { version: state.version, target, status: state.status, state: buildAgentContext(state), v4Decision, gpt: { status: 'SKIPPED_V4_TERMINAL_DECISION' } }); }
   }
-
   const gpt = await callOpenAI({ target, candidate: body.candidate ?? null, state, model: body.model, req });
   if (gpt.status === 'OK') {
-    if (!isGptDecisionAllowed(v4Decision, gpt.output.decision)) {
-      stopState(state, 'GPT_DECISION_CONFLICT_WITH_V4', { v4Decision: v4Decision?.decision ?? null, gptDecision: gpt.output.decision });
-      gpt.status = 'REJECTED_V4_AUTHORITY';
-    } else if (gpt.output.decision === 'STOP') {
-      stopState(state, 'GPT_STOP', gpt.output);
-    } else {
-      recordAction(state, `GPT:${gpt.output.nextAction}`);
-      state.lastResult = { type: 'GPT_DECISION', value: gpt.output };
-      state.nextAllowedAction = gpt.output.nextAction;
-    }
+    if (!isGptDecisionAllowed(v4Decision, gpt.output.decision)) { stopState(state, 'GPT_DECISION_CONFLICT_WITH_V4', { v4Decision: v4Decision?.decision ?? null, gptDecision: gpt.output.decision }); gpt.status = 'REJECTED_V4_AUTHORITY'; }
+    else if (gpt.output.decision === 'STOP') stopState(state, 'GPT_STOP', gpt.output);
+    else { recordAction(state, `GPT:${gpt.output.nextAction}`); state.lastResult = { type: 'GPT_DECISION', value: gpt.output }; state.nextAllowedAction = gpt.output.nextAction; }
   }
-
   return json(res, 200, { version: state.version, promptVersion: GPT_SOURCING_PROMPT_VERSION, target, status: state.status, state: buildAgentContext(state), v4Decision, gpt });
 }
