@@ -57,7 +57,7 @@ function renderResult(root, data) {
   const trace = Array.isArray(gpt?.toolTrace) ? gpt.toolTrace : [];
   const status = data?.status || gpt?.status || 'UNKNOWN';
   const decision = v4?.decision || gpt?.output?.decision || 'NON DÉCIDÉ';
-  const reason = v4?.reason || gpt?.output?.reason || gpt?.reason || 'Aucune raison disponible.';
+  const reason = v4?.reason || gpt?.output?.reason || gpt?.reason || data?.state?.lastResult?.reason || 'Aucune raison disponible.';
   const next = gpt?.output?.nextAction || data?.state?.nextAllowedAction || 'STOP';
   result.innerHTML = `
     <div style="border:1px solid #252d33;border-radius:10px;padding:13px;background:#0b0f12">
