@@ -138,7 +138,7 @@ async function runGptStatusTest(status, details = {}) {
     assert.equal(res.body.status, 'STOP');
     assert.equal(res.body.state.status, 'STOP');
     assert.ok(res.body.state.lastResult);
-    const expectedReason = details.error || status;
+    const expectedReason = details.expectedReason ?? details.error ?? status;
     assert.equal(res.body.state.lastResult.reason, expectedReason);
     assert.equal(res.body.gpt.status, status);
   } finally {
@@ -173,4 +173,4 @@ test('handler terminalises NOT_CONFIGURED when OpenAI configuration is missing',
 test('handler terminalises OPENAI_ERROR', async () => runGptStatusTest('OPENAI_ERROR', { httpOk: false, httpStatus: 500, error: 'provider failed' }));
 test('handler terminalises OPENAI_EMPTY', async () => runGptStatusTest('OPENAI_EMPTY'));
 test('handler terminalises OPENAI_INVALID_JSON', async () => runGptStatusTest('OPENAI_INVALID_JSON'));
-test('handler terminalises OPENAI_INVALID_OUTPUT', async () => runGptStatusTest('OPENAI_INVALID_OUTPUT'));
+test('handler terminalises OPENAI_INVALID_OUTPUT', async () => runGptStatusTest('OPENAI_INVALID_OUTPUT', { expectedReason: 'Invalid agent decision: MAYBE' }));
